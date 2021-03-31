@@ -28,7 +28,14 @@
 #include "cryptopp/modes.h"
 #include "cryptopp/filters.h"
 
+#include <iostream>
+#include <string>
+#include <cstring>
+
 using namespace CryptoPP;
+using namespace std;
+using CryptoPP::AAD_CHANNEL;
+
 
 
 Define_Module(IEEE802154Mac);
@@ -4565,8 +4572,177 @@ void IEEE802154Mac::handleBcnTxTimer()
             //tmpBcn->setPaFields(txPaFields);
 
             //inserimento Mic
-            char tmp[]="FFFF";
+            char tmp[]="This is data";
+            //char mac[]="100";
+            //int c = 5;
 
+            // Gladman's Test Vector 003
+            byte key[]={0x40,0x41,0x42,0x43,0x44,0x45,0x46,0x47,
+                0x48,0x49,0x4a,0x4b,0x4c,0x4d,0x4e,0x4f};
+
+            byte iv[]={0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,
+                0x18,0x19,0x1a,0x1b};
+
+            const byte aa[] = { 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,
+                0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,0x10,0x11,0x12,0x13 };
+            string adata = string( (const char*)aa, sizeof(aa) );
+
+            /**const byte pa[] = { 0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,
+                0x28,0x29,0x2a,0x2b,0x2c,0x2d,0x2e,0x2f,
+                0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37 };
+            string pdata = string( (const char*)pa, sizeof(pa) );**/
+            string pdata = "this is data";
+
+            const int TAG_SIZE = 16;
+
+            //CTX e3b201a9f5b71a7a9b1ceaeccd97e70b6176aad9a4428aa5
+            //TAG 484392fbc1b09951
+
+            string cipher, encoded;
+
+            // Recovered (decrypted)
+            string radata, rpdata;
+
+            /*********************************\
+            \*********************************/
+
+            try
+            {
+                CCM< AES, TAG_SIZE >::Encryption e;
+                e.SetKeyWithIV( key, sizeof(key), iv, sizeof(iv) );
+                e.SpecifyDataLengths( adata.size(), pdata.size(), 0 );
+
+                AuthenticatedEncryptionFilter ef( e,
+                    new StringSink( cipher )
+                ); // AuthenticatedEncryptionFilter
+
+                // AuthenticatedEncryptionFilter::ChannelPut
+                //  defines two channels: DEFAULT_CHANNEL and AAD_CHANNEL
+                //   DEFAULT_CHANNEL is encrypted and authenticated
+                //   AAD_CHANNEL is authenticated
+
+                //ef.ChannelPut(AAD_CHANNEL, adata.)
+
+                ef.ChannelPut( AAD_CHANNEL, reinterpret_cast<const unsigned char*>(adata.data()), adata.size() );
+                ef.ChannelMessageEnd(AAD_CHANNEL);
+
+
+
+                //ef.ChannelPut()
+
+
+                // Authenticated data *must* be pushed before
+                //  Confidential/Authenticated data
+                ef.ChannelPut( DEFAULT_CHANNEL,reinterpret_cast<const unsigned char*>(pdata.data()), pdata.size() );
+                ef.ChannelMessageEnd(DEFAULT_CHANNEL);
+            }
+            catch( CryptoPP::Exception& e )
+            {
+                cerr << "Caught Exception..." << endl;
+                cerr << e.what() << endl;
+                cerr << endl;
+            }
+
+            /*********************************\
+            \*********************************/
+
+            //
+            // The pair { adata, cipher } is sent to
+            //  the other party or persisted to storage
+            //
+
+            // Tamper with the first and last byte of the
+            //  encrypted data and tag
+            // if( cipher.size() > 1 )
+            // {
+            //    cipher[ 0 ] ^= 0x01;
+            //    cipher[ cipher.size()-1 ] ^= 0x01;
+            // }
+
+            /*********************************\
+            \*********************************/
+
+            try
+            {
+                // Not recovered - sent via clear text
+                radata = adata;
+
+
+                // Break the cipher text out into it's
+                //  components: Encrypted Data and MAC Tag Value
+                string enc = cipher.substr( 0, cipher.length()-TAG_SIZE );
+                string tag = cipher.substr( cipher.length()-TAG_SIZE );
+
+
+                // Sanity checks
+                //assert( cipher.size() == enc.size() + tag.size() );
+                //assert( enc.size() == pdata.size() );
+                //assert( TAG_SIZE == tag.size() );
+
+                CCM< AES, TAG_SIZE >::Decryption d;
+                d.SetKeyWithIV( key, sizeof(key), iv, sizeof(iv) );
+                d.SpecifyDataLengths( radata.size(), enc.size(), 0 );
+
+
+
+
+                // The object *will* throw an exception
+                //  during decryption\verification _if_
+                //  verification fails.
+                AuthenticatedDecryptionFilter df( d, NULL,
+                    AuthenticatedDecryptionFilter::MAC_AT_BEGIN |
+                    AuthenticatedDecryptionFilter::THROW_EXCEPTION
+                ); // AuthenticatedDecryptionFilter
+
+                //tag[3] = 'c';
+
+                // The order of the following calls are important
+                //  when using the MAC_AT_BEGIN flag
+                df.ChannelPut( DEFAULT_CHANNEL, reinterpret_cast<const unsigned char*>(tag.data()), tag.size() );
+                df.ChannelPut( AAD_CHANNEL, reinterpret_cast<const unsigned char*>(adata.data()), adata.size() );
+                df.ChannelPut( DEFAULT_CHANNEL, reinterpret_cast<const unsigned char*>(enc.data()), enc.size() );
+
+
+
+                // If the object throws, it will most likely occur
+                //   during ChannelMessageEnd()
+                df.ChannelMessageEnd( AAD_CHANNEL );
+                df.ChannelMessageEnd( DEFAULT_CHANNEL );
+
+                // If the object does not throw, here's the last
+                //  opportunity to check the status of the
+                //  data's integrity (both ADATA and PDATA)
+                //  before use.
+                bool b = false;
+                b = df.GetLastResult();
+                //assert( true == b );
+
+                // Remove data from the channel
+                string retrieved;
+                int n = -1;
+
+                // Plain text (recovered from enc.data())
+                df.SetRetrievalChannel( DEFAULT_CHANNEL );
+                n = df.MaxRetrievable();
+                retrieved.resize( n );
+
+                if( n > 0 ) { df.Get( (byte*)retrieved.data(), n ); }
+                rpdata = retrieved;
+                //assert( rpdata == pdata );
+
+                // All is well - work with data
+                cout << "Decrypted and Verified data. Ready for use." << endl;
+                cout << endl;
+                cout << "tag data: " << tag.data() << endl << "pdata: " << pdata.data() << endl << "encdata: " << enc.data() << endl << "rpdata: " << rpdata.data() << endl;
+            }
+            catch( CryptoPP::Exception& e )
+            {
+                cerr << "Caught Exception..." << endl;
+                cerr << e.what() << endl;
+                cerr << endl;
+            }
+
+            /**
 
             //
             // Key and IV setup
@@ -4574,18 +4750,19 @@ void IEEE802154Mac::handleBcnTxTimer()
             byte key[ CryptoPP::AES::DEFAULT_KEYLENGTH ], iv[ CryptoPP::AES::BLOCKSIZE ];
             memset( key, 0x00, CryptoPP::AES::DEFAULT_KEYLENGTH );
             memset( iv, 0x00, CryptoPP::AES::BLOCKSIZE );
+            //sto coso copia il valore al centro il numero di volte (per byte) scritte a destra a partire dal puntatore scritto a sinistra
 
             //
             // String and Sink setup
             //
-            std::string plaintext = "Now is the time for all good men to come to the aide...";
+            std::string plaintext = "This is data";
             std::string ciphertext;
             std::string decryptedtext;
 
             //
             // Dump Plain Text
             //
-            std::cout << "Plain Text (" << plaintext.size() << " bytes)" << std::endl;
+            std::cout << "Plain Text (" << plaintext << "   " << plaintext.size() << " bytes)" << std::endl;
             std::cout << plaintext;
             std::cout << std::endl << std::endl;
 
@@ -4594,6 +4771,8 @@ void IEEE802154Mac::handleBcnTxTimer()
             //
             CryptoPP::AES::Encryption aesEncryption(key, CryptoPP::AES::DEFAULT_KEYLENGTH);
             CryptoPP::CBC_Mode_ExternalCipher::Encryption cbcEncryption( aesEncryption, iv );
+            CCM< AES >::Encryption e;
+            e.EncryptAndAuthenticate();
 
             CryptoPP::StreamTransformationFilter stfEncryptor(cbcEncryption, new CryptoPP::StringSink( ciphertext ) );
             stfEncryptor.Put( reinterpret_cast<const unsigned char*>( plaintext.c_str() ), plaintext.length() + 1 );
@@ -4639,6 +4818,8 @@ void IEEE802154Mac::handleBcnTxTimer()
 
             // Recovered plain text
             std::string rpdata;
+
+            **/
 
             MICSec mic32(4);
             mic32.setMic(tmp);
