@@ -311,6 +311,14 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         void FSM_MCPS_DATA_request(phyState pStatus = phy_SUCCESS, MACenum mStatus = mac_SUCCESS);
         void resetTRX();
 
+
+        std::string AEADCypher(std::string adata, std::string pdata);
+        std::string AEADDecypher( std::string cypher,std::string radata);
+        void setAPDATA(std::string *adata, std::string *pdata, mpdu *frame, const char *s,bool encryption);
+        std::string secPacket(mpdu *frame, const char *s);
+        std::string secRecPacket(mpdu *frame, const char *s, std::string cipher);
+        void printHex(std::string text);
+
     private:
 
         NotificationBoard *nb;

@@ -56,7 +56,9 @@ packet mpdu
     bool isGTS = false;		    // Added extra for GTS logic
     bool isIndirect=false;      // Added extra for indirect transmissions
     MICSec mic;
-    
+    string payload;
+    string chipherT;
+       
 }
 
 packet beaconFrame extends mpdu

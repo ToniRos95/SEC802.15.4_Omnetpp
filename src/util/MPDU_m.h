@@ -40,6 +40,8 @@
  *     bool isGTS = false;		    // Added extra for GTS logic
  *     bool isIndirect = false;      // Added extra for indirect transmissions
  *     MICSec mic;
+ *     string payload;
+ *     string chipherT;
  * 
  * }
  * </pre>
@@ -58,6 +60,8 @@ class mpdu : public ::cPacket
     bool isGTS_var;
     bool isIndirect_var;
     MICSec mic_var;
+    opp_string payload_var;
+    opp_string chipherT_var;
 
   private:
     void copy(const mpdu& other);
@@ -102,13 +106,17 @@ class mpdu : public ::cPacket
     virtual MICSec& getMic();
     virtual const MICSec& getMic() const {return const_cast<mpdu*>(this)->getMic();}
     virtual void setMic(const MICSec& mic);
+    virtual const char * getPayload() const;
+    virtual void setPayload(const char * payload);
+    virtual const char * getChipherT() const;
+    virtual void setChipherT(const char * chipherT);
 };
 
 inline void doPacking(cCommBuffer *b, mpdu& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, mpdu& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:63</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:65</tt> by nedtool.
  * <pre>
  * packet beaconFrame extends mpdu
  * {
@@ -158,7 +166,7 @@ inline void doPacking(cCommBuffer *b, beaconFrame& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, beaconFrame& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:70</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:72</tt> by nedtool.
  * <pre>
  * packet beaconNotify
  * {
@@ -211,7 +219,7 @@ inline void doPacking(cCommBuffer *b, beaconNotify& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, beaconNotify& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:79</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:81</tt> by nedtool.
  * <pre>
  * packet CmdFrame extends mpdu
  * {
@@ -249,7 +257,7 @@ inline void doPacking(cCommBuffer *b, CmdFrame& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, CmdFrame& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:84</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:86</tt> by nedtool.
  * <pre>
  * packet RealignCmd extends CmdFrame
  * {
@@ -303,7 +311,7 @@ inline void doPacking(cCommBuffer *b, RealignCmd& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, RealignCmd& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:93</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:95</tt> by nedtool.
  * <pre>
  * packet GTSCmd extends CmdFrame
  * {
@@ -342,7 +350,7 @@ inline void doPacking(cCommBuffer *b, GTSCmd& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, GTSCmd& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:98</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:100</tt> by nedtool.
  * <pre>
  * packet DisAssoCmd extends CmdFrame
  * {
@@ -380,7 +388,7 @@ inline void doPacking(cCommBuffer *b, DisAssoCmd& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, DisAssoCmd& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:103</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:105</tt> by nedtool.
  * <pre>
  * packet AssoCmdreq extends CmdFrame
  * {
@@ -419,7 +427,7 @@ inline void doPacking(cCommBuffer *b, AssoCmdreq& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, AssoCmdreq& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:108</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:110</tt> by nedtool.
  * <pre>
  * packet AssoCmdresp extends CmdFrame
  * {
@@ -461,7 +469,7 @@ inline void doPacking(cCommBuffer *b, AssoCmdresp& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, AssoCmdresp& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:114</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:116</tt> by nedtool.
  * <pre>
  * packet AckFrame
  * {
@@ -507,7 +515,7 @@ inline void doPacking(cCommBuffer *b, AckFrame& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, AckFrame& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:121</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:123</tt> by nedtool.
  * <pre>
  * packet DisAssociation
  * {
@@ -582,7 +590,7 @@ inline void doPacking(cCommBuffer *b, DisAssociation& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, DisAssociation& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:135</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:137</tt> by nedtool.
  * <pre>
  * packet Association
  * {
@@ -642,7 +650,7 @@ inline void doPacking(cCommBuffer *b, Association& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, Association& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:145</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:147</tt> by nedtool.
  * <pre>
  * packet AssociationRequest extends Association
  * {
@@ -697,7 +705,7 @@ inline void doPacking(cCommBuffer *b, AssociationRequest& obj) {obj.parsimPack(b
 inline void doUnpacking(cCommBuffer *b, AssociationRequest& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:154</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:156</tt> by nedtool.
  * <pre>
  * packet AssociationResponse extends Association
  * {
@@ -736,7 +744,7 @@ inline void doPacking(cCommBuffer *b, AssociationResponse& obj) {obj.parsimPack(
 inline void doUnpacking(cCommBuffer *b, AssociationResponse& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:160</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:162</tt> by nedtool.
  * <pre>
  * packet AssociationConfirm extends Association
  * {
@@ -775,7 +783,7 @@ inline void doPacking(cCommBuffer *b, AssociationConfirm& obj) {obj.parsimPack(b
 inline void doUnpacking(cCommBuffer *b, AssociationConfirm& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:166</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:168</tt> by nedtool.
  * <pre>
  * packet GTSMessage
  * {
@@ -830,7 +838,7 @@ inline void doPacking(cCommBuffer *b, GTSMessage& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, GTSMessage& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:175</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:177</tt> by nedtool.
  * <pre>
  * packet GTSIndication extends GTSMessage
  * {
@@ -868,7 +876,7 @@ inline void doPacking(cCommBuffer *b, GTSIndication& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, GTSIndication& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:180</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:182</tt> by nedtool.
  * <pre>
  * packet GTSConfirm
  * {
@@ -911,7 +919,7 @@ inline void doPacking(cCommBuffer *b, GTSConfirm& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, GTSConfirm& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:186</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:188</tt> by nedtool.
  * <pre>
  * message MLMEReset
  * {
@@ -950,7 +958,7 @@ inline void doPacking(cCommBuffer *b, MLMEReset& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, MLMEReset& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:192</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:194</tt> by nedtool.
  * <pre>
  * message RxEnableRequest
  * {
@@ -999,7 +1007,7 @@ inline void doPacking(cCommBuffer *b, RxEnableRequest& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, RxEnableRequest& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:202</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:204</tt> by nedtool.
  * <pre>
  * message RxEnableConfirm
  * {
@@ -1037,7 +1045,7 @@ inline void doPacking(cCommBuffer *b, RxEnableConfirm& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, RxEnableConfirm& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:207</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:209</tt> by nedtool.
  * <pre>
  * message ScanRequest
  * {
@@ -1103,7 +1111,7 @@ inline void doPacking(cCommBuffer *b, ScanRequest& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, ScanRequest& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:219</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:221</tt> by nedtool.
  * <pre>
  * message ScanConfirm
  * {
@@ -1172,7 +1180,7 @@ inline void doPacking(cCommBuffer *b, ScanConfirm& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, ScanConfirm& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:230</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:232</tt> by nedtool.
  * <pre>
  * packet OrphanIndication
  * {
@@ -1227,7 +1235,7 @@ inline void doPacking(cCommBuffer *b, OrphanIndication& obj) {obj.parsimPack(b);
 inline void doUnpacking(cCommBuffer *b, OrphanIndication& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:239</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:241</tt> by nedtool.
  * <pre>
  * packet OrphanResponse extends OrphanIndication
  * {
@@ -1269,7 +1277,7 @@ inline void doPacking(cCommBuffer *b, OrphanResponse& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, OrphanResponse& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:245</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:247</tt> by nedtool.
  * <pre>
  * message StartRequest
  * {
@@ -1371,7 +1379,7 @@ inline void doPacking(cCommBuffer *b, StartRequest& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, StartRequest& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:266</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:268</tt> by nedtool.
  * <pre>
  * message StartConfirm
  * {
@@ -1409,7 +1417,7 @@ inline void doPacking(cCommBuffer *b, StartConfirm& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, StartConfirm& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:271</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:273</tt> by nedtool.
  * <pre>
  * message SyncRequest
  * {
@@ -1455,7 +1463,7 @@ inline void doPacking(cCommBuffer *b, SyncRequest& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, SyncRequest& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:278</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:280</tt> by nedtool.
  * <pre>
  * message SyncIndication
  * {
@@ -1521,7 +1529,7 @@ inline void doPacking(cCommBuffer *b, SyncIndication& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, SyncIndication& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:290</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:292</tt> by nedtool.
  * <pre>
  * message PollRequest
  * {
@@ -1584,7 +1592,7 @@ inline void doPacking(cCommBuffer *b, PollRequest& obj) {obj.parsimPack(b);}
 inline void doUnpacking(cCommBuffer *b, PollRequest& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>util/MPDU.msg:301</tt> by nedtool.
+ * Class generated from <tt>util/MPDU.msg:303</tt> by nedtool.
  * <pre>
  * message PollConfirm
  * {

@@ -64,6 +64,8 @@ mpdu::mpdu(const char *name, int kind) : ::cPacket(name,kind)
     this->fcf_var = 0;
     this->isGTS_var = false;
     this->isIndirect_var = false;
+    this->payload_var = 0;
+    this->chipherT_var = 0;
 }
 
 mpdu::mpdu(const mpdu& other) : ::cPacket(other)
@@ -96,6 +98,8 @@ void mpdu::copy(const mpdu& other)
     this->isGTS_var = other.isGTS_var;
     this->isIndirect_var = other.isIndirect_var;
     this->mic_var = other.mic_var;
+    this->payload_var = other.payload_var;
+    this->chipherT_var = other.chipherT_var;
 }
 
 void mpdu::parsimPack(cCommBuffer *b)
@@ -112,6 +116,8 @@ void mpdu::parsimPack(cCommBuffer *b)
     doPacking(b,this->isGTS_var);
     doPacking(b,this->isIndirect_var);
     doPacking(b,this->mic_var);
+    doPacking(b,this->payload_var);
+    doPacking(b,this->chipherT_var);
 }
 
 void mpdu::parsimUnpack(cCommBuffer *b)
@@ -128,6 +134,8 @@ void mpdu::parsimUnpack(cCommBuffer *b)
     doUnpacking(b,this->isGTS_var);
     doUnpacking(b,this->isIndirect_var);
     doUnpacking(b,this->mic_var);
+    doUnpacking(b,this->payload_var);
+    doUnpacking(b,this->chipherT_var);
 }
 
 unsigned short mpdu::getFcs() const
@@ -240,6 +248,26 @@ void mpdu::setMic(const MICSec& mic)
     this->mic_var = mic;
 }
 
+const char * mpdu::getPayload() const
+{
+    return payload_var.c_str();
+}
+
+void mpdu::setPayload(const char * payload)
+{
+    this->payload_var = payload;
+}
+
+const char * mpdu::getChipherT() const
+{
+    return chipherT_var.c_str();
+}
+
+void mpdu::setChipherT(const char * chipherT)
+{
+    this->chipherT_var = chipherT;
+}
+
 class mpduDescriptor : public cClassDescriptor
 {
   public:
@@ -287,7 +315,7 @@ const char *mpduDescriptor::getProperty(const char *propertyname) const
 int mpduDescriptor::getFieldCount(void *object) const
 {
     cClassDescriptor *basedesc = getBaseClassDescriptor();
-    return basedesc ? 11+basedesc->getFieldCount(object) : 11;
+    return basedesc ? 13+basedesc->getFieldCount(object) : 13;
 }
 
 unsigned int mpduDescriptor::getFieldTypeFlags(void *object, int field) const
@@ -310,8 +338,10 @@ unsigned int mpduDescriptor::getFieldTypeFlags(void *object, int field) const
         FD_ISEDITABLE,
         FD_ISEDITABLE,
         FD_ISCOMPOUND,
+        FD_ISEDITABLE,
+        FD_ISEDITABLE,
     };
-    return (field>=0 && field<11) ? fieldTypeFlags[field] : 0;
+    return (field>=0 && field<13) ? fieldTypeFlags[field] : 0;
 }
 
 const char *mpduDescriptor::getFieldName(void *object, int field) const
@@ -334,8 +364,10 @@ const char *mpduDescriptor::getFieldName(void *object, int field) const
         "isGTS",
         "isIndirect",
         "mic",
+        "payload",
+        "chipherT",
     };
-    return (field>=0 && field<11) ? fieldNames[field] : NULL;
+    return (field>=0 && field<13) ? fieldNames[field] : NULL;
 }
 
 int mpduDescriptor::findField(void *object, const char *fieldName) const
@@ -353,6 +385,8 @@ int mpduDescriptor::findField(void *object, const char *fieldName) const
     if (fieldName[0]=='i' && strcmp(fieldName, "isGTS")==0) return base+8;
     if (fieldName[0]=='i' && strcmp(fieldName, "isIndirect")==0) return base+9;
     if (fieldName[0]=='m' && strcmp(fieldName, "mic")==0) return base+10;
+    if (fieldName[0]=='p' && strcmp(fieldName, "payload")==0) return base+11;
+    if (fieldName[0]=='c' && strcmp(fieldName, "chipherT")==0) return base+12;
     return basedesc ? basedesc->findField(object, fieldName) : -1;
 }
 
@@ -376,8 +410,10 @@ const char *mpduDescriptor::getFieldTypeString(void *object, int field) const
         "bool",
         "bool",
         "MICSec",
+        "string",
+        "string",
     };
-    return (field>=0 && field<11) ? fieldTypeStrings[field] : NULL;
+    return (field>=0 && field<13) ? fieldTypeStrings[field] : NULL;
 }
 
 const char *mpduDescriptor::getFieldProperty(void *object, int field, const char *propertyname) const
@@ -428,6 +464,8 @@ std::string mpduDescriptor::getFieldAsString(void *object, int field, int i) con
         case 8: return bool2string(pp->getIsGTS());
         case 9: return bool2string(pp->getIsIndirect());
         case 10: {std::stringstream out; out << pp->getMic(); return out.str();}
+        case 11: return oppstring2string(pp->getPayload());
+        case 12: return oppstring2string(pp->getChipherT());
         default: return "";
     }
 }
@@ -449,6 +487,8 @@ bool mpduDescriptor::setFieldAsString(void *object, int field, int i, const char
         case 7: pp->setFcf(string2ulong(value)); return true;
         case 8: pp->setIsGTS(string2bool(value)); return true;
         case 9: pp->setIsIndirect(string2bool(value)); return true;
+        case 11: pp->setPayload((value)); return true;
+        case 12: pp->setChipherT((value)); return true;
         default: return false;
     }
 }
