@@ -49,6 +49,16 @@ MacPIB::MacPIB()
     macTimestampSupported = true;
     macTransactionPersistenceTime = 500;
     macAckWaitDuration = 0;
+    Seculevel=6;
+
+}
+
+unsigned char MacPIB::getSeculevel(){
+    return Seculevel;
+}
+
+void MacPIB::setSeculevel( unsigned char Sec){
+    Seculevel= Sec;
 }
 
 int MacPIB::getMacAckWaitDuration()

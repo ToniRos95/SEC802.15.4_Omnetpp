@@ -91,9 +91,17 @@ void IEEE802154Mac::initialize(int stage) {
         mpib.setMacRxOnWhenIdle(true); // if not, we wont receive any Messages during CFP / CAP
         mpib.setMacPromiscuousMode(par("promiscuousMode").boolValue());
 
+
+        ////// SICUREZZAAAAAAAAAAAAAA
+        mpib.setSeculevel(par("Seculevel"));
+
+
         // initialize MacDSN (data sequence number) and MacBSN (beacon sequence number) to random 8-bit values
         //mpib.setMacDSN(intrand(255));
         mpib.setMacBSN(intrand(255));
+
+
+
 
         // XXX instead of randomly selecting a 8-bit MacDSN, we use the index of the node for the moment
         // module path to traverse: net.IEEE802154Nodes[index].NIC.MAC.IEEE802154Mac
@@ -4234,6 +4242,19 @@ void IEEE802154Mac::handleBcnRxTimer() {
 }
 
 void IEEE802154Mac::handleBcnTxTimer() {
+
+    /*
+     * BEACON PACCHETTO
+     *
+     * frame control # sequence number # addressing field # ash # superframe specification # gts info # pending address # beacon payload # fcs
+     *
+     *  ash= security control * frame Count * key identifier
+     *  addressing field= srcPANID * MACADDRESS src * destPANID * MACADDRESS dest
+     *  superframe specification= BO * BI * SO * SD * finalCap * battLifeExt * panCoor * assoPmt
+     *
+     * */
+
+
     if (mpib.getMacBeaconOrder() < 15) // for Beacon-enabled PANs (beacon order < 0x0F)
             {
         if (!txNow_bcnTxTimer)  // enable the transmitter
@@ -4295,6 +4316,9 @@ void IEEE802154Mac::handleBcnTxTimer() {
             //inserimento Mic
 
             if (mpib.getMacSecurityEnabled()) {
+                Ash assoAsh;
+                assoAsh.secu.Seculevel= mpib.getSeculevel();
+                tmpBcn->setAsh(assoAsh);
 
                 tmpBcn->setPayload(secPacket(tmpBcn->dup(), tmpBcn->getName()).c_str());
                 /*
@@ -5856,68 +5880,66 @@ void IEEE802154Mac::setAPDATA(std::string *atemp, std::string *ptemp, mpdu *fram
 
     if (strcmp(s, "Ieee802154BEACONTimer") == 0) {
 
+        /*
+            * BEACON PACCHETTO
+            *
+            * fcs # frame control # sequence number # addressing field # ash # superframe specification # gts info # pending address # beacon payload
+            *
+            *  ash= security control * frame Count * key identifier
+            *  addressing field= srcPANID * MACADDRESS src * destPANID * MACADDRESS dest
+            *  superframe specification= BO * BI * SO * SD * finalCap * battLifeExt * panCoor * assoPmt
+            *
+            * */
+
+
         beaconFrame *tmpBcn = check_and_cast<beaconFrame *>(frame);
 
-        *adata += tmpBcn->getAsh().secu.Seculevel;
+        *adata += tmpBcn->getFcf();
         *adata += '#';
-        *adata += tmpBcn->getAsh().secu.KeyIdMode;
-        *adata += '#';
-        *adata += tmpBcn->getAsh().FrameCount;
-        *adata += '#';
-        *adata += tmpBcn->getAsh().KeyIdentifier.KeySource;
-        *adata += '#';
-        *adata += tmpBcn->getAsh().KeyIdentifier.KeyIndex;
-        *adata += '#';
-        *adata += tmpBcn->getSrc().str();
-        *adata += '#';
-        *adata += tmpBcn->getSrcPANid();
-        *adata += '#';
-        *adata += tmpBcn->getDest().str();
-        *adata += '#';
-        *adata += tmpBcn->getDestPANid();
+        //frame control
         *adata += '#';
         *adata += tmpBcn->getSqnr();
         *adata += '#';
-        *adata += tmpBcn->getFcf();
+        *adata += tmpBcn->getSrcPANid();
+        *adata += '*';
+        *adata += tmpBcn->getSrc().str();
+        *adata += '*';
+        *adata += tmpBcn->getDestPANid();
+        *adata += '*';
+        *adata += tmpBcn->getDest().str();
         *adata += '#';
-        *adata += tmpBcn->getIsGTS();
+        *adata += tmpBcn->getAsh().secu.Seculevel;
+        *adata += tmpBcn->getAsh().secu.KeyIdMode;
+        *adata += '*';
+        *adata += tmpBcn->getAsh().FrameCount;
+        *adata += '*';
+        *adata += tmpBcn->getAsh().KeyIdentifier.KeySource;
+        *adata += tmpBcn->getAsh().KeyIdentifier.KeyIndex;
         *adata += '#';
-        *adata += tmpBcn->getIsIndirect();
 
         if (encryption) {
             std::string *pdata=ptemp;
 
             *pdata += txSfSpec.BO;
-            *pdata += '#';
+            *pdata += '*';
             *pdata += txSfSpec.BI;
-            *pdata += '#';
+            *pdata += '*';
             *pdata += txSfSpec.SO;
-            *pdata += '#';
+            *pdata += '*';
             *pdata += txSfSpec.SD;
-            *pdata += '#';
+            *pdata += '*';
             *pdata += txSfSpec.finalCap;
-            *pdata += '#';
+            *pdata += '*';
             *pdata += txSfSpec.battLifeExt;
-            *pdata += '#';
+            *pdata += '*';
             *pdata += txSfSpec.panCoor;
-            *pdata += '#';
+            *pdata += '*';
             *pdata += txSfSpec.assoPmt;
             *pdata += '#';
-
-            /*
-             pdata +=tmpBcn->getGtsList(0).;
-             pdata +=tmpBcn->getGtsList(0);
-             pdata +=tmpBcn->getGtsList(0);
-             pdata +='#';
-             pdata +=tmpBcn->getGtsList(0);
-             pdata +=tmpBcn->getGtsList(0);
-             pdata +=tmpBcn->getGtsList(0);
-             pdata +='#';
-             pdata +=tmpBcn->getGtsList(0);
-             pdata +='#';
-             vedere se  conviene mettere il gts e il pandingfields
-
-             */
+            //gts
+            *pdata += '#';
+            // pending field
+            *pdata += '#';
             *pdata += tmpBcn->getPayload();
         }
 
@@ -5935,6 +5957,10 @@ std::string IEEE802154Mac::secPacket(mpdu *frame, const char *s){
     std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
     std::cout << adata;
     std::cout << std::endl << std::endl;
+
+    std::cout << " TESTO ADATA IN HEX"<< endl;
+    printHex(adata);
+    std::cout <<endl << endl;
 
     std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
             << std::endl;

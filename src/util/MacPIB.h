@@ -97,6 +97,10 @@ class MacPIB
         simtime_t getMacTransactionPersistenceTime();
         void setMacTransactionPersistenceTime(simtime_t val);
 
+
+        void setSeculevel( unsigned char Sec);
+        unsigned char getSeculevel();
+
     private:
         unsigned int macAckWaitDuration;
         bool macAssociatedPANCoord;
@@ -154,6 +158,13 @@ class MacPIB
         unsigned short macSuperframeOrder; // Range 0 - 15
         unsigned short macSyncSymbolOffset;
         bool macTimestampSupported;
+
+
+        unsigned char Seculevel;
+
+
+
+
         /*
          * @brief The maximum time that a transaction is stored by a coordinator and indicated in its beacon
          */

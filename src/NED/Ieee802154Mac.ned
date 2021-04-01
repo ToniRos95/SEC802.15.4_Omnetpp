@@ -39,6 +39,8 @@ simple IEEE802154Mac
         bool promiscuousMode = default(false);  	// set to true to enable promicious mode (accept all packages)
         bool SecurityEnabled = default(false);
         bool isFFD = default(true);             	// full function devices yes/no
+        
+      	int Seculevel;
 
     gates:
         // LLC interface
