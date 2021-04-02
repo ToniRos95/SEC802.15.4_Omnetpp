@@ -685,29 +685,22 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
         switch (mappedMlmeRequestTypes[msg->getName()]) {
         case MLMEASSOCIATE: {
 
-            std::cout << "KAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA \n";
-
             if (isCoordinator) {
                 macEV
                 << msg->getName()
                         << "is dropped - PAN Coordinator won't associate... \n";
                 delete msg;
-                std::cout
-                        << "MEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE \n";
                 return;
             } else if (mpib.getMacAssociatedPANCoord()) {
                 macEV
                 << msg->getName()
                         << "is dropped - Device is already associated - dissociate first... \n";
                 delete msg;
-                std::cout << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA \n";
                 return;
             } else if (!isFFD) {
                 macEV
                 << msg->getName() << "is dropped - RFD won't associate...\n";
                 delete msg;
-                std::cout
-                        << "MEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE  2 \n";
 
                 return;
             } else if (dynamic_cast<AssociationRequest *>(msg)) {
@@ -726,7 +719,6 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
                     AssoCommand->setFcf(
                             genFCF(Command, mpib.getMacSecurityEnabled(), false,
                                     true, true, addrShort, 01, addrLong));
-                    std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA \n";
                     break;
                 }
                 case addrLong: {
@@ -735,8 +727,6 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
                     AssoCommand->setFcf(
                             genFCF(Command, mpib.getMacSecurityEnabled(), false,
                                     true, true, addrLong, 01, addrLong));
-                    std::cout
-                            << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 1 \n";
                     break;
                 }
                 default: {
@@ -744,8 +734,6 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
                     << msg->getName()
                             << "is dropped - has unsupported Addressing Mode...\n";
                     delete msg;
-                    std::cout
-                            << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 2 \n";
                     return;
                 }
                 }
@@ -778,8 +766,6 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
                     assoAsh.secu.KeyIdMode = frame->getKeyIdMode();
                     assoAsh.secu.Seculevel = frame->getSecurityLevel();
                     AssoCommand->setAsh(assoAsh);
-                    std::cout
-                            << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 3\n";
                 }
 
                 mpdu* holdMe = new mpdu("MLME-COMMAND.inside");
@@ -804,9 +790,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
                 strcpy(taskP.taskFrFunc(task), "handle_PD_DATA_request");
                 ASSERT(txData == NULL);
                 txData = holdMe;
-                std::cout << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 4\n";
                 csmacaEntry('d');
-                std::cout << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 5\n";
+
 
 
                 delete (msg);    // fix for undisposed object message
@@ -1650,10 +1635,10 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
              unsigned int value;
              converter >> std::hex >> value;
              **/
-            int bi;
-            int sd;
-            std::istringstream(sfSpec[1]) >> bi;
-            std::istringstream(sfSpec[3]) >> sd;
+            unsigned int bi;
+            unsigned int sd;
+            std::istringstream(sfSpec[1]) >> std::hex >> bi;
+            std::istringstream(sfSpec[3]) >> std::hex >> sd;
 
             /**
              std::string str_hex = "f000";
@@ -1664,11 +1649,13 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
              */
 
             SuperframeSpec tempSfSpec = { (unsigned char) sfSpec[0][0],
-                    (unsigned int) bi, (unsigned char) sfSpec[2][0],
-                    (unsigned int) sd, (unsigned char) sfSpec[4][0],
-                            sfSpec[5][0] == '\x00' ? false : true,
-                            sfSpec[6][0] == '\x00' ? false : true,
-                            sfSpec[7][0] == '\x00' ? false : true };
+                    bi,
+                    (unsigned char) sfSpec[2][0],
+                    sd,
+                    (unsigned char) sfSpec[4][0],
+                     sfSpec[5][0] == '\x00' ? false : true,
+                     sfSpec[6][0] == '\x00' ? false : true,
+                     sfSpec[7][0] == '\x00' ? false : true };
 
             rxSfSpec = tempSfSpec;
 
@@ -3268,9 +3255,12 @@ void IEEE802154Mac::csmacaEntry(char pktType) {
         if (backoffStatus == 99)  // backoff for data packet
                 {
             backoffStatus = 0;
+
             csmacaCancel();
+
         }
         csmacaResume();
+
     } else if (pktType == 'u')  // txBcnCmdUpper
             {
         waitBcnCmdUpperAck = false;  // command packet not yet transmitted
@@ -3306,6 +3296,7 @@ void IEEE802154Mac::csmacaResume() {
             ackReq = ((txBcnCmd->getFcf() & arequMask) >> arequShift);
             txCsmaca = txBcnCmd;
             csmacaStart(true, txBcnCmd, ackReq);
+
             return;
         } else if ((txBcnCmdUpper) && (!waitBcnCmdUpperAck)) {
             strcpy(taskP.taskFrFunc(TP_MCPS_DATA_REQUEST), "csmacaCallBack"); // the transmission may be interrupted and need to backoff again
@@ -3314,6 +3305,7 @@ void IEEE802154Mac::csmacaResume() {
             ackReq = ((txBcnCmdUpper->getFcf() & arequMask) >> arequShift);
             txCsmaca = txBcnCmdUpper;
             csmacaStart(true, txBcnCmdUpper, ackReq);
+
             return;
         } else if ((txData) && (!waitDataAck)) {
             strcpy(taskP.taskFrFunc(TP_MCPS_DATA_REQUEST), "csmacaCallBack"); // the transmission may be interrupted and need to backoff again
@@ -3334,7 +3326,6 @@ void IEEE802154Mac::csmacaStart(bool firsttime, mpdu* frame, bool ackReq) {
         tmpCsmaca = NULL;
         return;
     }
-
     ASSERT(!backoffTimer->isScheduled());
 
     if (firsttime) {
@@ -3370,6 +3361,7 @@ void IEEE802154Mac::csmacaStart(bool firsttime, mpdu* frame, bool ackReq) {
     macEV
     << "[CSMA]: Backoff time after adjusting: " << wtime * 1000 << " ms \n";
     bool backoff = true;
+    std::cout << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 10\n";
 
     if (beaconEnabled) {
         if (firsttime) {
