@@ -49,7 +49,7 @@ MacPIB::MacPIB()
     macTimestampSupported = true;
     macTransactionPersistenceTime = 500;
     macAckWaitDuration = 0;
-    Seculevel=6;
+    Seculevel=4;
 
 }
 

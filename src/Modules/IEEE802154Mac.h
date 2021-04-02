@@ -24,6 +24,7 @@
 #include <omnetpp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <vector>
 
 #include "MacPIB.h"
 
@@ -38,6 +39,7 @@
 #include "RadioState.h"             // from INET - provides RadioState enums
 #include "PhyControlInfo_m.h"       // from INET - provides PhyIndication enums
 #include "NotificationBoard.h"      // from INET - provides NotificationBoard access
+
 
 #define macEV (ev.isDisabled()||!macDebug) ? EV : EV << "[802154_MAC]: "    // switchable debug output
 
@@ -318,6 +320,7 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         std::string secPacket(mpdu *frame, const char *s);
         std::string secRecPacket(mpdu *frame, const char *s, std::string cipher);
         void printHex(std::string text);
+        std::vector<std::string> parserSecMessage(std::string str,char ch);
 
     private:
 

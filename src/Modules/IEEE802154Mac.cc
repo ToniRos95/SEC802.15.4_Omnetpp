@@ -22,6 +22,7 @@
 #include "cryptopp/ccm.h"
 #include "cryptopp/aes.h"
 
+
 #include <iostream>
 #include <iomanip>
 
@@ -31,6 +32,7 @@
 #include <iostream>
 #include <string>
 #include <cstring>
+#include <vector>
 
 using namespace CryptoPP;
 using namespace std;
@@ -1553,10 +1555,51 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
 
     if (mpib.getMacSecurityEnabled()) {
 
-        std::string prova = secRecPacket(bcnFrame, bcnFrame->getName(), bcnFrame->getPayload());
+        std::string encoded = secRecPacket(bcnFrame, bcnFrame->getName(), bcnFrame->getPayload());
         std::cout << " TESTO DECIFRATO IN HEX" << endl;
-        printHex(prova);
+        printHex(encoded);
         std::cout << endl;
+
+        //std::string authenticated;
+        //std::string null;
+        std::vector<string> result;
+        std::cout << " PARSER" << endl;
+        //setAPDATA(&authenticated,&null,bcnFrame, bcnFrame->getName(),false);
+        result= parserSecMessage(encoded,'\x23');
+
+        std::vector<string> sfSpec= parserSecMessage(result[0],'\x2a');
+        SuperframeSpec tempSfSpec= {
+                    sfSpec[0][0],
+                    sfSpec[1][0],
+                    sfSpec[2][0],
+                    sfSpec[3][0],
+                    sfSpec[4][0],
+                    sfSpec[5][0]=='\x00'?false:true,
+                    sfSpec[6][0]=='\x00'?false:true,
+                    sfSpec[7][0]=='\x00'?false:true
+        };
+
+        rxSfSpec = tempSfSpec;
+
+        /*
+        tempSfSpec.BO = sfSpec[0][0];//reinterpret_cast< const unsigned char> (sfSpec[i].data());
+        tempSfSpec.BI = sfSpec[1][0]; // stoi serve per castare string a int
+        tempSfSpec.SO =  sfSpec[2][0];
+        tempSfSpec.SD =  sfSpec[3][0];
+        tempSfSpec.finalCap = sfSpec[4][0];
+        rxSfSpec.battLifeExt = sfSpec[5][0]=='\x00'?false:true;
+        rxSfSpec.panCoor = sfSpec[6][0]=='\x00'?false:true;
+        rxSfSpec.assoPmt = sfSpec[7][0]=='\x00'?false:true;
+        */
+
+        std::cout << "RXSFSPEC  " << endl;
+        std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
+
+        /*
+         * # *
+         *
+         * */
+
     }
 
     simtime_t now = simTime();
@@ -1578,7 +1621,15 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
     } else {
         unsigned short frmCtrl = frame->getFcf();
         // update beacon parameters
-        rxSfSpec = bcnFrame->getSfSpec();
+
+        // se la sicurezza del pacchetto non è abilitata, l'algoritmo prenderà il campo rxSfSpec dal pacchetto in chiaro. altrimenti
+        // è già settata in precedenza
+
+        if(!(mpib.getMacSecurityEnabled())){
+
+            rxSfSpec = bcnFrame->getSfSpec();
+
+        }
         rxBO = rxSfSpec.BO;
         rxSO = rxSfSpec.SO;
         rxSfSlotDuration = aBaseSlotDuration * (1 << rxSO);
@@ -4301,9 +4352,18 @@ void IEEE802154Mac::handleBcnTxTimer() {
             txSfSpec.panCoor = isCoordinator;
             txSfSpec.assoPmt = mpib.getMacAssociationPermit();
 
+            std::cout << "TXSFSPEC  " << endl;
+            std::cout << txSfSpec.BO <<" "<<  txSfSpec.BI <<" "<< txSfSpec.SO <<" "<< txSfSpec.SD <<" "<<  txSfSpec.finalCap <<" "<< txSfSpec.battLifeExt <<" "<< txSfSpec.panCoor <<" "<<txSfSpec.assoPmt<< endl;
+
+
             // this parameter may vary each time when new GTS slots were allocated in last superframe
             txSfSpec.finalCap = tmp_finalCap;
-            tmpBcn->setSfSpec(txSfSpec);
+
+            if ( !(mpib.getMacSecurityEnabled()) ){
+
+                tmpBcn->setSfSpec(txSfSpec);
+            }
+
 
             // populate the GTS fields -- TODO more TBD when considering GTS
             for (int i = 0; i < 7; i++) {
@@ -4321,19 +4381,7 @@ void IEEE802154Mac::handleBcnTxTimer() {
                 tmpBcn->setAsh(assoAsh);
 
                 tmpBcn->setPayload(secPacket(tmpBcn->dup(), tmpBcn->getName()).c_str());
-                /*
-                 std::stringstream madonna;
 
-                 for( int i = 0; i < adata.size(); i++ ) {
-
-                 madonna << std::hex << (0xFF & static_cast<CryptoPP::byte>(adata[i])) << " ";
-
-                 }
-
-
-                 //adata = madonna.str();
-
-                 */
 
             }
 
@@ -6003,6 +6051,40 @@ void IEEE802154Mac::printHex(std::string text){
 
     }
 
+}
+
+vector<string> IEEE802154Mac::parserSecMessage(std::string str,char ch){
+
+    string next;
+    vector<string> result;
+
+    // For each character in the string
+    for (string::const_iterator it = str.begin(); it != str.end(); it++) {
+        // If we've hit the terminal character
+        if (*it == ch) {
+            // If we have some characters accumulated
+            //if (!next.empty()) {
+                // Add them to the result vector
+                result.push_back(next);
+                next.clear();
+            //}
+        } else {
+            // Accumulate the next character into the sequence
+            next += *it;
+        }
+    }
+    if (!next.empty())
+         result.push_back(next);
+
+    return result;
+/*
+ *
+ * METODO PER STAMPARE IL RISULTATO DEL PARSER
+ *
+    for (size_t i = 0; i < result.size(); i++) {
+        cout << "\"" << result[i] << "\"" << endl;
+    }
+*/
 }
 
 void IEEE802154Mac::finish() {
