@@ -22,7 +22,6 @@
 #include "cryptopp/ccm.h"
 #include "cryptopp/aes.h"
 
-
 #include <iostream>
 #include <iomanip>
 
@@ -33,6 +32,8 @@
 #include <string>
 #include <cstring>
 #include <vector>
+#include <sstream>
+#include <iomanip>
 
 using namespace CryptoPP;
 using namespace std;
@@ -93,17 +94,12 @@ void IEEE802154Mac::initialize(int stage) {
         mpib.setMacRxOnWhenIdle(true); // if not, we wont receive any Messages during CFP / CAP
         mpib.setMacPromiscuousMode(par("promiscuousMode").boolValue());
 
-
         ////// SICUREZZAAAAAAAAAAAAAA
         mpib.setSeculevel(par("Seculevel"));
-
 
         // initialize MacDSN (data sequence number) and MacBSN (beacon sequence number) to random 8-bit values
         //mpib.setMacDSN(intrand(255));
         mpib.setMacBSN(intrand(255));
-
-
-
 
         // XXX instead of randomly selecting a 8-bit MacDSN, we use the index of the node for the moment
         // module path to traverse: net.IEEE802154Nodes[index].NIC.MAC.IEEE802154Mac
@@ -493,7 +489,7 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
         mpib.setMacBeaconOrder(startMsg->getBeaconOrder());
         mpib.setMacSuperframeOrder(startMsg->getSuperframeOrder());
         mpib.setMacBattLifeExt(startMsg->getBatteryLifeExtension());
-        mpib.setMacPANId(startMsg->getPANId());  // use MAC extended address
+        mpib.setMacPANId(startMsg->getPANId());  // us+e MAC extended address
         mpib.setMacAssociationPermit(true);
         if (isCoordinator) {
             par("isPANCoordinator").setBoolValue(isCoordinator);
@@ -1555,7 +1551,8 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
 
     if (mpib.getMacSecurityEnabled()) {
 
-        std::string encoded = secRecPacket(bcnFrame, bcnFrame->getName(), bcnFrame->getPayload());
+        std::string encoded = secRecPacket(bcnFrame, bcnFrame->getName(),
+                bcnFrame->getPayload());
         std::cout << " TESTO DECIFRATO IN HEX" << endl;
         printHex(encoded);
         std::cout << endl;
@@ -1565,36 +1562,62 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
         std::vector<string> result;
         std::cout << " PARSER" << endl;
         //setAPDATA(&authenticated,&null,bcnFrame, bcnFrame->getName(),false);
-        result= parserSecMessage(encoded,'\x23');
+        result = parserSecMessage(encoded, '\x23');
 
-        std::vector<string> sfSpec= parserSecMessage(result[0],'\x2a');
-        SuperframeSpec tempSfSpec= {
-                    sfSpec[0][0],
-                    sfSpec[1][0],
-                    sfSpec[2][0],
-                    sfSpec[3][0],
-                    sfSpec[4][0],
-                    sfSpec[5][0]=='\x00'?false:true,
-                    sfSpec[6][0]=='\x00'?false:true,
-                    sfSpec[7][0]=='\x00'?false:true
-        };
+        std::vector<string> sfSpec = parserSecMessage(result[0], '\x2a');
+
+        std::cout << "RXSFSPEC  " << endl;
+        printHex(sfSpec[0]);
+        printHex(sfSpec[1]);
+        printHex(sfSpec[2]);
+        printHex(sfSpec[3]);
+        printHex(sfSpec[4]);
+        printHex(sfSpec[5]);
+        printHex(sfSpec[6]);
+        printHex(sfSpec[7]);
+        std::cout << "RXSFSPEC FINE " << endl;
+
+        std::string str_dec = "1987520";
+          std::string str_hex = "2f04e009";
+          std::string str_bin = "-11101001100100111010";
+          std::string str_auto = "0x7fffff";
+
+          std::string::size_type sz;   // alias of size_t
+
+          long li_dec = std::stol (str_dec,&sz);
+          long li_hex = std::stol (str_hex,nullptr,16);
+          long li_bin = std::stol (str_bin,nullptr,2);
+          long li_auto = std::stol (str_auto,nullptr,0);
+
+          std::cout << str_dec << ": " << li_dec << '\n';
+          std::cout << str_hex << ": " << li_hex << '\n';
+          std::cout << str_bin << ": " << li_bin << '\n';
+          std::cout << str_auto << ": " << li_auto << '\n';
+
+          /**
+        std::string str_hex = "f000";
+        long li_hex = std::stol (str_hex,nullptr,16);
+
+
+        std::cout<< "decimalValue  " << str_hex << ": " << li_hex << '\n';
+    */
+        SuperframeSpec tempSfSpec = {
+                sfSpec[0][0],
+                sfSpec[1][0],
+                sfSpec[2][0],
+                sfSpec[3][0],
+                sfSpec[4][0],
+                sfSpec[5][0] == '\x00' ? false : true,
+                sfSpec[6][0] == '\x00' ? false : true,
+                sfSpec[7][0] == '\x00' ? false : true };
 
         rxSfSpec = tempSfSpec;
 
-        /*
-        tempSfSpec.BO = sfSpec[0][0];//reinterpret_cast< const unsigned char> (sfSpec[i].data());
-        tempSfSpec.BI = sfSpec[1][0]; // stoi serve per castare string a int
-        tempSfSpec.SO =  sfSpec[2][0];
-        tempSfSpec.SD =  sfSpec[3][0];
-        tempSfSpec.finalCap = sfSpec[4][0];
-        rxSfSpec.battLifeExt = sfSpec[5][0]=='\x00'?false:true;
-        rxSfSpec.panCoor = sfSpec[6][0]=='\x00'?false:true;
-        rxSfSpec.assoPmt = sfSpec[7][0]=='\x00'?false:true;
-        */
 
-        std::cout << "RXSFSPEC  " << endl;
-        std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
 
+
+        //std::cout << "RXSFSPEC  " << endl;
+        //std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
         /*
          * # *
          *
@@ -1625,11 +1648,11 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
         // se la sicurezza del pacchetto non è abilitata, l'algoritmo prenderà il campo rxSfSpec dal pacchetto in chiaro. altrimenti
         // è già settata in precedenza
 
-        if(!(mpib.getMacSecurityEnabled())){
+        //  if (!(mpib.getMacSecurityEnabled())) {
 
-            rxSfSpec = bcnFrame->getSfSpec();
+        rxSfSpec = bcnFrame->getSfSpec();
 
-        }
+        //  }
         rxBO = rxSfSpec.BO;
         rxSO = rxSfSpec.SO;
         rxSfSlotDuration = aBaseSlotDuration * (1 << rxSO);
@@ -4305,7 +4328,6 @@ void IEEE802154Mac::handleBcnTxTimer() {
      *
      * */
 
-
     if (mpib.getMacBeaconOrder() < 15) // for Beacon-enabled PANs (beacon order < 0x0F)
             {
         if (!txNow_bcnTxTimer)  // enable the transmitter
@@ -4352,18 +4374,53 @@ void IEEE802154Mac::handleBcnTxTimer() {
             txSfSpec.panCoor = isCoordinator;
             txSfSpec.assoPmt = mpib.getMacAssociationPermit();
 
-            std::cout << "TXSFSPEC  " << endl;
-            std::cout << txSfSpec.BO <<" "<<  txSfSpec.BI <<" "<< txSfSpec.SO <<" "<< txSfSpec.SD <<" "<<  txSfSpec.finalCap <<" "<< txSfSpec.battLifeExt <<" "<< txSfSpec.panCoor <<" "<<txSfSpec.assoPmt<< endl;
-
-
             // this parameter may vary each time when new GTS slots were allocated in last superframe
             txSfSpec.finalCap = tmp_finalCap;
 
-            if ( !(mpib.getMacSecurityEnabled()) ){
+            // for (int i = 0; i < text.size(); i++) {
+
+            //  std::cout << std::hex << (0xFF &  txSfSpec.BO) << " ";
+
+            // }
+            std::cout << "TXSFSPEC  " << endl;
+            std::cout << std::hex << (0xFF & txSfSpec.BO) << endl;
+            std::cout << std::hex << txSfSpec.BI << endl;
+            std::cout << std::hex << (0xFF & txSfSpec.SO) << endl;
+            std::cout << std::hex << txSfSpec.SD << endl;
+            std::cout << std::hex << (0xFF & txSfSpec.finalCap) << endl;
+            int a = txSfSpec.battLifeExt ? 1 : 0;
+            std::cout << std::hex << a << endl;
+            a = txSfSpec.panCoor ? 1 : 0;
+            std::cout << std::hex << a << endl;
+            a = txSfSpec.assoPmt ? 1 : 0;
+            std::cout << std::hex << a << endl;
+            std::cout << "TXSFSPEC  " << endl;
+            /*
+             std::cout << "TXSFSPEC  " << endl;
+             printHex( std::string(1, txSfSpec.BO));
+             printHex(std::string(1,txSfSpec.BI));
+             printHex(std::string(1,txSfSpec.SO));
+             printHex(txSfSpec.SD);
+             printHex(txSfSpec.finalCap);
+             printHex( txSfSpec.battLifeExt);
+             printHex(txSfSpec.panCoor);
+             printHex(txSfSpec.assoPmt);
+
+             std::cout << "TXSFSPEC FINE " << endl;
+             */
+
+            /*
+             std::cout << "TXSFSPEC  " << endl;
+             std::cout << txSfSpec.BO << " " << txSfSpec.BI << " " << txSfSpec.SO
+             << " " << txSfSpec.SD << " " << txSfSpec.finalCap << " "
+             << txSfSpec.battLifeExt << " " << txSfSpec.panCoor << " "
+             << txSfSpec.assoPmt << endl;
+             */
+
+            if (!(mpib.getMacSecurityEnabled())) {
 
                 tmpBcn->setSfSpec(txSfSpec);
             }
-
 
             // populate the GTS fields -- TODO more TBD when considering GTS
             for (int i = 0; i < 7; i++) {
@@ -4377,11 +4434,11 @@ void IEEE802154Mac::handleBcnTxTimer() {
 
             if (mpib.getMacSecurityEnabled()) {
                 Ash assoAsh;
-                assoAsh.secu.Seculevel= mpib.getSeculevel();
+                assoAsh.secu.Seculevel = mpib.getSeculevel();
                 tmpBcn->setAsh(assoAsh);
 
-                tmpBcn->setPayload(secPacket(tmpBcn->dup(), tmpBcn->getName()).c_str());
-
+                tmpBcn->setPayload(
+                        secPacket(tmpBcn->dup(), tmpBcn->getName()).c_str());
 
             }
 
@@ -5921,24 +5978,23 @@ std::string IEEE802154Mac::AEADDecypher(std::string cipher,
 
 }
 
-void IEEE802154Mac::setAPDATA(std::string *atemp, std::string *ptemp, mpdu *frame,
-        const char *s, bool encryption) {
+void IEEE802154Mac::setAPDATA(std::string *atemp, std::string *ptemp,
+        mpdu *frame, const char *s, bool encryption) {
 
-    std::string *adata=atemp;
+    std::string *adata = atemp;
 
     if (strcmp(s, "Ieee802154BEACONTimer") == 0) {
 
         /*
-            * BEACON PACCHETTO
-            *
-            * fcs # frame control # sequence number # addressing field # ash # superframe specification # gts info # pending address # beacon payload
-            *
-            *  ash= security control * frame Count * key identifier
-            *  addressing field= srcPANID * MACADDRESS src * destPANID * MACADDRESS dest
-            *  superframe specification= BO * BI * SO * SD * finalCap * battLifeExt * panCoor * assoPmt
-            *
-            * */
-
+         * BEACON PACCHETTO
+         *
+         * fcs # frame control # sequence number # addressing field # ash # superframe specification # gts info # pending address # beacon payload
+         *
+         *  ash= security control * frame Count * key identifier
+         *  addressing field= srcPANID * MACADDRESS src * destPANID * MACADDRESS dest
+         *  superframe specification= BO * BI * SO * SD * finalCap * battLifeExt * panCoor * assoPmt
+         *
+         * */
 
         beaconFrame *tmpBcn = check_and_cast<beaconFrame *>(frame);
 
@@ -5966,15 +6022,20 @@ void IEEE802154Mac::setAPDATA(std::string *atemp, std::string *ptemp, mpdu *fram
         *adata += '#';
 
         if (encryption) {
-            std::string *pdata=ptemp;
+            std::string *pdata = ptemp;
+            std::stringstream stream;
 
             *pdata += txSfSpec.BO;
             *pdata += '*';
-            *pdata += txSfSpec.BI;
+            stream << std::hex << txSfSpec.BI;
+            *pdata += stream.str();
+            stream.str("");
             *pdata += '*';
             *pdata += txSfSpec.SO;
             *pdata += '*';
-            *pdata += txSfSpec.SD;
+            stream << std::hex << txSfSpec.SD;
+            *pdata += stream.str();
+            stream.str("");
             *pdata += '*';
             *pdata += txSfSpec.finalCap;
             *pdata += '*';
@@ -5995,65 +6056,64 @@ void IEEE802154Mac::setAPDATA(std::string *atemp, std::string *ptemp, mpdu *fram
 
 }
 
-std::string IEEE802154Mac::secPacket(mpdu *frame, const char *s){
+std::string IEEE802154Mac::secPacket(mpdu *frame, const char *s) {
 
+    std::string adata, pdata;
 
-    std::string adata,pdata;
-
-    setAPDATA(&adata,&pdata,frame,s,true);
+    setAPDATA(&adata, &pdata, frame, s, true);
 
     std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
     std::cout << adata;
     std::cout << std::endl << std::endl;
 
-    std::cout << " TESTO ADATA IN HEX"<< endl;
+    std::cout << " TESTO ADATA IN HEX" << endl;
     printHex(adata);
-    std::cout <<endl << endl;
+    std::cout << endl << endl;
 
     std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
             << std::endl;
     std::cout << pdata;
     std::cout << std::endl << std::endl;
 
-    std::cout << " TESTO IN CHIARO IN HEX"<< endl;
+    std::cout << " TESTO IN CHIARO IN HEX" << endl;
     printHex(pdata);
-    std::cout <<endl << endl;
+    std::cout << endl << endl;
 
     std::string cipherT = AEADCypher(adata, pdata);
 
-    std::cout << " TESTO CIFRATO IN HEX"<< endl;
+    std::cout << " TESTO CIFRATO IN HEX" << endl;
     printHex(cipherT);
-    std::cout <<endl << endl;
+    std::cout << endl << endl;
 
     return cipherT;
 
 }
 
-std::string IEEE802154Mac::secRecPacket(mpdu *frame, const char *s, std::string cipher){
-
+std::string IEEE802154Mac::secRecPacket(mpdu *frame, const char *s,
+        std::string cipher) {
 
     std::string radata;
     std::string null;
 
-    setAPDATA(&radata,&null,frame,s,false);
+    setAPDATA(&radata, &null, frame, s, false);
 
-    std::string decipherT = AEADDecypher(cipher,radata);
+    std::string decipherT = AEADDecypher(cipher, radata);
 
     return decipherT;
 
 }
 
-void IEEE802154Mac::printHex(std::string text){
+void IEEE802154Mac::printHex(std::string text) {
 
-    for( int i = 0; i < text.size(); i++ ) {
+    for (int i = 0; i < text.size(); i++) {
 
         std::cout << std::hex << (0xFF & static_cast<byte>(text[i])) << " ";
 
     }
-
+    std::cout << endl;
 }
 
-vector<string> IEEE802154Mac::parserSecMessage(std::string str,char ch){
+vector<string> IEEE802154Mac::parserSecMessage(std::string str, char ch) {
 
     string next;
     vector<string> result;
@@ -6064,9 +6124,9 @@ vector<string> IEEE802154Mac::parserSecMessage(std::string str,char ch){
         if (*it == ch) {
             // If we have some characters accumulated
             //if (!next.empty()) {
-                // Add them to the result vector
-                result.push_back(next);
-                next.clear();
+            // Add them to the result vector
+            result.push_back(next);
+            next.clear();
             //}
         } else {
             // Accumulate the next character into the sequence
@@ -6074,17 +6134,17 @@ vector<string> IEEE802154Mac::parserSecMessage(std::string str,char ch){
         }
     }
     if (!next.empty())
-         result.push_back(next);
+        result.push_back(next);
 
     return result;
-/*
- *
- * METODO PER STAMPARE IL RISULTATO DEL PARSER
- *
-    for (size_t i = 0; i < result.size(); i++) {
-        cout << "\"" << result[i] << "\"" << endl;
-    }
-*/
+    /*
+     *
+     * METODO PER STAMPARE IL RISULTATO DEL PARSER
+     *
+     for (size_t i = 0; i < result.size(); i++) {
+     cout << "\"" << result[i] << "\"" << endl;
+     }
+     */
 }
 
 void IEEE802154Mac::finish() {
