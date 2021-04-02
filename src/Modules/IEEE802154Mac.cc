@@ -684,22 +684,31 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
         // Has to be a MLME request Message from higher layer
         switch (mappedMlmeRequestTypes[msg->getName()]) {
         case MLMEASSOCIATE: {
+
+            std::cout << "KAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA \n";
+
             if (isCoordinator) {
                 macEV
                 << msg->getName()
                         << "is dropped - PAN Coordinator won't associate... \n";
                 delete msg;
+                std::cout
+                        << "MEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE \n";
                 return;
             } else if (mpib.getMacAssociatedPANCoord()) {
                 macEV
                 << msg->getName()
                         << "is dropped - Device is already associated - dissociate first... \n";
                 delete msg;
+                std::cout << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA \n";
                 return;
             } else if (!isFFD) {
                 macEV
                 << msg->getName() << "is dropped - RFD won't associate...\n";
                 delete msg;
+                std::cout
+                        << "MEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE  2 \n";
+
                 return;
             } else if (dynamic_cast<AssociationRequest *>(msg)) {
                 AssociationRequest* frame =
@@ -717,6 +726,7 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
                     AssoCommand->setFcf(
                             genFCF(Command, mpib.getMacSecurityEnabled(), false,
                                     true, true, addrShort, 01, addrLong));
+                    std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA \n";
                     break;
                 }
                 case addrLong: {
@@ -725,6 +735,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
                     AssoCommand->setFcf(
                             genFCF(Command, mpib.getMacSecurityEnabled(), false,
                                     true, true, addrLong, 01, addrLong));
+                    std::cout
+                            << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 1 \n";
                     break;
                 }
                 default: {
@@ -732,6 +744,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
                     << msg->getName()
                             << "is dropped - has unsupported Addressing Mode...\n";
                     delete msg;
+                    std::cout
+                            << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 2 \n";
                     return;
                 }
                 }
@@ -764,6 +778,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
                     assoAsh.secu.KeyIdMode = frame->getKeyIdMode();
                     assoAsh.secu.Seculevel = frame->getSecurityLevel();
                     AssoCommand->setAsh(assoAsh);
+                    std::cout
+                            << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 3\n";
                 }
 
                 mpdu* holdMe = new mpdu("MLME-COMMAND.inside");
@@ -775,19 +791,26 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
                 holdMe->setSqnr(AssoCommand->getSqnr());
                 holdMe->setByteLength(calcFrameByteLength(AssoCommand));
 
+
+
                 Ieee802154MacTaskType task = TP_MCPS_DATA_REQUEST;
                 taskP.taskStatus(task) = true;
+
+
 
                 // Associate Requests always direct to Coordinator
                 taskP.mcps_data_request_TxOption = DIRECT_TRANS;
                 taskP.taskStep(task)++; // advance to next task step
-                strcpy
-                (taskP.taskFrFunc(task), "handle_PD_DATA_request");
+                strcpy(taskP.taskFrFunc(task), "handle_PD_DATA_request");
                 ASSERT(txData == NULL);
                 txData = holdMe;
+                std::cout << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 4\n";
                 csmacaEntry('d');
+                std::cout << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 5\n";
+
 
                 delete (msg);    // fix for undisposed object message
+
                 return;
             }
             break;
@@ -1543,106 +1566,8 @@ void IEEE802154Mac::handleSelfMsg(cMessage* msg) {
 }
 
 void IEEE802154Mac::handleBeacon(mpdu *frame) {
-    macEV << "Starting processing received Beacon frame EHEHEHEHEHEHEEHEHEH \n";
+    macEV << "Starting processing received Beacon frame  \n";
     beaconFrame *bcnFrame = check_and_cast<beaconFrame *>(frame);
-
-    //AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-    macEV << "\n HANDLE BEACON " << bcnFrame->getMic().getMicAuth() << "\n\n";
-
-    if (mpib.getMacSecurityEnabled()) {
-
-        std::string encoded = secRecPacket(bcnFrame, bcnFrame->getName(),
-                bcnFrame->getPayload());
-
-        /**
-        std::cout << " TESTO DECIFRATO IN HEX" << endl;
-        printHex(encoded);
-        std::cout << endl;
-        **/
-
-        //std::string authenticated;
-        //std::string null;
-        std::vector<string> result;
-        //std::cout << " PARSER" << endl;
-        //setAPDATA(&authenticated,&null,bcnFrame, bcnFrame->getName(),false);
-        result = parserSecMessage(encoded, '\x23');
-
-        std::vector<string> sfSpec = parserSecMessage(result[0], '\x2a');
-
-        /**
-        std::cout << "RXSFSPEC  " << endl;
-        printHex(sfSpec[0]);
-        printHex(sfSpec[1]);
-        printHex(sfSpec[2]);
-        printHex(sfSpec[3]);
-        printHex(sfSpec[4]);
-        printHex(sfSpec[5]);
-        printHex(sfSpec[6]);
-        printHex(sfSpec[7]);
-        std::cout << "RXSFSPEC FINE " << endl;
-
-
-        std::string str_dec = "1987520";
-          std::string str_hex = "2f04e009";
-          std::string str_bin = "-11101001100100111010";
-          std::string str_auto = "0x7fffff";
-
-          std::string::size_type sz;   // alias of size_t
-
-          long li_dec = std::stol (str_dec,&sz);
-          int li_hex = std::stoi (str_hex,nullptr,16);
-          long li_bin = std::stol (str_bin,nullptr,2);
-          long li_auto = std::stol (str_auto,nullptr,0);
-
-          std::cout << str_dec << ": " << li_dec << '\n';
-          std::cout << str_hex << ": " << li_hex << '\n';
-          std::cout << str_bin << ": " << li_bin << '\n';
-          std::cout << str_auto << ": " << li_auto << '\n';
-        **/
-
-
-
-        std::istringstream converter("f000");
-        unsigned int value;
-        converter >> std::hex >> value;
-        int bi;
-        int sd;
-        std::istringstream(sfSpec[1]) >> bi;
-        std::istringstream(sfSpec[3]) >> sd;
-
-          /**
-        std::string str_hex = "f000";
-        long li_hex = std::stol (str_hex,nullptr,16);
-
-
-        std::cout<< "decimalValue  " << str_hex << ": " << li_hex << '\n';
-    */
-
-        SuperframeSpec tempSfSpec = {
-                (unsigned char)sfSpec[0][0],
-                (unsigned int)bi,
-                (unsigned char)sfSpec[2][0],
-                (unsigned int)sd,
-                (unsigned char)sfSpec[4][0],
-                sfSpec[5][0] == '\x00' ? false : true,
-                sfSpec[6][0] == '\x00' ? false : true,
-                sfSpec[7][0] == '\x00' ? false : true
-        };
-
-        rxSfSpec = tempSfSpec;
-
-
-
-
-        //std::cout << "RXSFSPEC  " << endl;
-        //std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
-        /*
-         * # *
-         *
-         * */
-
-    }
-
     simtime_t now = simTime();
 
     if (scanning) {
@@ -1666,11 +1591,96 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
         // se la sicurezza del pacchetto non è abilitata, l'algoritmo prenderà il campo rxSfSpec dal pacchetto in chiaro. altrimenti
         // è già settata in precedenza
 
-        //  if (!(mpib.getMacSecurityEnabled())) {
+        if (!(mpib.getMacSecurityEnabled())) {
 
-        rxSfSpec = bcnFrame->getSfSpec();
+            rxSfSpec = bcnFrame->getSfSpec();
 
-        //  }
+        } else {
+
+            std::string encoded = secRecPacket(bcnFrame, bcnFrame->getName(),
+                    bcnFrame->getPayload());
+
+            /**
+             std::cout << " TESTO DECIFRATO IN HEX" << endl;
+             printHex(encoded);
+             std::cout << endl;
+             **/
+
+            //std::string authenticated;
+            //std::string null;
+            std::vector<string> result;
+            //std::cout << " PARSER" << endl;
+            //setAPDATA(&authenticated,&null,bcnFrame, bcnFrame->getName(),false);
+            result = parserSecMessage(encoded, '\x23');
+
+            std::vector<string> sfSpec = parserSecMessage(result[0], '\x2a');
+
+            /**
+             std::cout << "RXSFSPEC  " << endl;
+             printHex(sfSpec[0]);
+             printHex(sfSpec[1]);
+             printHex(sfSpec[2]);
+             printHex(sfSpec[3]);
+             printHex(sfSpec[4]);
+             printHex(sfSpec[5]);
+             printHex(sfSpec[6]);
+             printHex(sfSpec[7]);
+             std::cout << "RXSFSPEC FINE " << endl;
+
+
+             std::string str_dec = "1987520";
+             std::string str_hex = "2f04e009";
+             std::string str_bin = "-11101001100100111010";
+             std::string str_auto = "0x7fffff";
+
+             std::string::size_type sz;   // alias of size_t
+
+             long li_dec = std::stol (str_dec,&sz);
+             int li_hex = std::stoi (str_hex,nullptr,16);
+             long li_bin = std::stol (str_bin,nullptr,2);
+             long li_auto = std::stol (str_auto,nullptr,0);
+
+             std::cout << str_dec << ": " << li_dec << '\n';
+             std::cout << str_hex << ": " << li_hex << '\n';
+             std::cout << str_bin << ": " << li_bin << '\n';
+             std::cout << str_auto << ": " << li_auto << '\n';
+             **/
+            /**
+             std::istringstream converter("f000");
+             unsigned int value;
+             converter >> std::hex >> value;
+             **/
+            int bi;
+            int sd;
+            std::istringstream(sfSpec[1]) >> bi;
+            std::istringstream(sfSpec[3]) >> sd;
+
+            /**
+             std::string str_hex = "f000";
+             long li_hex = std::stol (str_hex,nullptr,16);
+
+
+             std::cout<< "decimalValue  " << str_hex << ": " << li_hex << '\n';
+             */
+
+            SuperframeSpec tempSfSpec = { (unsigned char) sfSpec[0][0],
+                    (unsigned int) bi, (unsigned char) sfSpec[2][0],
+                    (unsigned int) sd, (unsigned char) sfSpec[4][0],
+                            sfSpec[5][0] == '\x00' ? false : true,
+                            sfSpec[6][0] == '\x00' ? false : true,
+                            sfSpec[7][0] == '\x00' ? false : true };
+
+            rxSfSpec = tempSfSpec;
+
+            //std::cout << "RXSFSPEC  " << endl;
+            //std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
+            /*
+             * # *
+             *
+             * */
+
+        }
+
         rxBO = rxSfSpec.BO;
         rxSO = rxSfSpec.SO;
         rxSfSlotDuration = aBaseSlotDuration * (1 << rxSO);
@@ -1756,6 +1766,7 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
         }
         genBeaconInd(frame);        // inform higher layer
         resetTRX();
+
     }
     numRxBcnPkt++;
     return;
@@ -4338,7 +4349,7 @@ void IEEE802154Mac::handleBcnTxTimer() {
     /*
      * BEACON PACCHETTO
      *
-     * frame control # sequence number # addressing field # ash # superframe specification # gts info # pending address # beacon payload # fcs
+     *  fcs # frame control # sequence number # addressing field # ash # superframe specification # gts info # pending address # beacon payload
      *
      *  ash= security control * frame Count * key identifier
      *  addressing field= srcPANID * MACADDRESS src * destPANID * MACADDRESS dest
@@ -4401,19 +4412,19 @@ void IEEE802154Mac::handleBcnTxTimer() {
 
             // }
             /**
-            std::cout << "TXSFSPEC  " << endl;
-            std::cout << std::hex << (0xFF & txSfSpec.BO) << endl;
-            std::cout << std::hex << txSfSpec.BI << endl;
-            std::cout << std::hex << (0xFF & txSfSpec.SO) << endl;
-            std::cout << std::hex << txSfSpec.SD << endl;
-            std::cout << std::hex << (0xFF & txSfSpec.finalCap) << endl;
-            int a = txSfSpec.battLifeExt ? 1 : 0;
-            std::cout << std::hex << a << endl;
-            a = txSfSpec.panCoor ? 1 : 0;
-            std::cout << std::hex << a << endl;
-            a = txSfSpec.assoPmt ? 1 : 0;
-            std::cout << std::hex << a << endl;
-            std::cout << "TXSFSPEC  " << endl;
+             std::cout << "TXSFSPEC  " << endl;
+             std::cout << std::hex << (0xFF & txSfSpec.BO) << endl;
+             std::cout << std::hex << txSfSpec.BI << endl;
+             std::cout << std::hex << (0xFF & txSfSpec.SO) << endl;
+             std::cout << std::hex << txSfSpec.SD << endl;
+             std::cout << std::hex << (0xFF & txSfSpec.finalCap) << endl;
+             int a = txSfSpec.battLifeExt ? 1 : 0;
+             std::cout << std::hex << a << endl;
+             a = txSfSpec.panCoor ? 1 : 0;
+             std::cout << std::hex << a << endl;
+             a = txSfSpec.assoPmt ? 1 : 0;
+             std::cout << std::hex << a << endl;
+             std::cout << "TXSFSPEC  " << endl;
 
              std::cout << "TXSFSPEC  " << endl;
              printHex( std::string(1, txSfSpec.BO));
@@ -4710,13 +4721,15 @@ void IEEE802154Mac::handleBcnTxTimer() {
              std::string rpdata;
 
              **/
-            char tmp[] = "This is data";
-            MICSec mic32(4);
-            mic32.setMic(tmp);
-            tmpBcn->setMic(mic32);
+            /**
+             char tmp[] = "This is data";
+             MICSec mic32(4);
+             mic32.setMic(tmp);
+             tmpBcn->setMic(mic32);
 
-            macEV << "\n HANDLEBEACONTIMER  " << mic32.getMicAuth() << "\n"; //<< *mic32.getMicAuth() << "\n\n";
-            //EV << "\n";
+             macEV << "\n HANDLEBEACONTIMER  " << mic32.getMicAuth() << "\n"; //<< *mic32.getMicAuth() << "\n\n";
+             //EV << "\n";
+             **/
 
             tmpBcn->setByteLength(calcFrameByteLength(tmpBcn));
 
@@ -5982,7 +5995,7 @@ std::string IEEE802154Mac::AEADDecypher(std::string cipher,
         // All is well - work with data
         cout << "Decrypted and Verified data. Ready for use." << endl;
         cout << endl;
-       // cout << "DECIFRATURA rpdata: " << retrieved.data() << endl;
+        // cout << "DECIFRATURA rpdata: " << retrieved.data() << endl;
 
         return retrieved;
 
@@ -6083,27 +6096,27 @@ std::string IEEE802154Mac::secPacket(mpdu *frame, const char *s) {
     std::string cipherT = AEADCypher(adata, pdata);
 
     /*
-    std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
-    std::cout << adata;
-    std::cout << std::endl << std::endl;
+     std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
+     std::cout << adata;
+     std::cout << std::endl << std::endl;
 
-    std::cout << " TESTO ADATA IN HEX" << endl;
-    printHex(adata);
-    std::cout << endl << endl;
+     std::cout << " TESTO ADATA IN HEX" << endl;
+     printHex(adata);
+     std::cout << endl << endl;
 
-    std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
-            << std::endl;
-    std::cout << pdata;
-    std::cout << std::endl << std::endl;
+     std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
+     << std::endl;
+     std::cout << pdata;
+     std::cout << std::endl << std::endl;
 
-    std::cout << " TESTO IN CHIARO IN HEX" << endl;
-    printHex(pdata);
-    std::cout << endl << endl;
+     std::cout << " TESTO IN CHIARO IN HEX" << endl;
+     printHex(pdata);
+     std::cout << endl << endl;
 
-    std::cout << " TESTO CIFRATO IN HEX" << endl;
-    printHex(cipherT);
-    std::cout << endl << endl;
-    */
+     std::cout << " TESTO CIFRATO IN HEX" << endl;
+     printHex(cipherT);
+     std::cout << endl << endl;
+     */
 
     return cipherT;
 
