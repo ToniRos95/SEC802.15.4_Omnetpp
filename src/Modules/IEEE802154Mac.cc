@@ -1553,19 +1553,23 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
 
         std::string encoded = secRecPacket(bcnFrame, bcnFrame->getName(),
                 bcnFrame->getPayload());
+
+        /**
         std::cout << " TESTO DECIFRATO IN HEX" << endl;
         printHex(encoded);
         std::cout << endl;
+        **/
 
         //std::string authenticated;
         //std::string null;
         std::vector<string> result;
-        std::cout << " PARSER" << endl;
+        //std::cout << " PARSER" << endl;
         //setAPDATA(&authenticated,&null,bcnFrame, bcnFrame->getName(),false);
         result = parserSecMessage(encoded, '\x23');
 
         std::vector<string> sfSpec = parserSecMessage(result[0], '\x2a');
 
+        /**
         std::cout << "RXSFSPEC  " << endl;
         printHex(sfSpec[0]);
         printHex(sfSpec[1]);
@@ -1577,6 +1581,7 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
         printHex(sfSpec[7]);
         std::cout << "RXSFSPEC FINE " << endl;
 
+
         std::string str_dec = "1987520";
           std::string str_hex = "2f04e009";
           std::string str_bin = "-11101001100100111010";
@@ -1585,7 +1590,7 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
           std::string::size_type sz;   // alias of size_t
 
           long li_dec = std::stol (str_dec,&sz);
-          long li_hex = std::stol (str_hex,nullptr,16);
+          int li_hex = std::stoi (str_hex,nullptr,16);
           long li_bin = std::stol (str_bin,nullptr,2);
           long li_auto = std::stol (str_auto,nullptr,0);
 
@@ -1593,6 +1598,17 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
           std::cout << str_hex << ": " << li_hex << '\n';
           std::cout << str_bin << ": " << li_bin << '\n';
           std::cout << str_auto << ": " << li_auto << '\n';
+        **/
+
+
+
+        std::istringstream converter("f000");
+        unsigned int value;
+        converter >> std::hex >> value;
+        int bi;
+        int sd;
+        std::istringstream(sfSpec[1]) >> bi;
+        std::istringstream(sfSpec[3]) >> sd;
 
           /**
         std::string str_hex = "f000";
@@ -1601,15 +1617,17 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
 
         std::cout<< "decimalValue  " << str_hex << ": " << li_hex << '\n';
     */
+
         SuperframeSpec tempSfSpec = {
-                sfSpec[0][0],
-                sfSpec[1][0],
-                sfSpec[2][0],
-                sfSpec[3][0],
-                sfSpec[4][0],
+                (unsigned char)sfSpec[0][0],
+                (unsigned int)bi,
+                (unsigned char)sfSpec[2][0],
+                (unsigned int)sd,
+                (unsigned char)sfSpec[4][0],
                 sfSpec[5][0] == '\x00' ? false : true,
                 sfSpec[6][0] == '\x00' ? false : true,
-                sfSpec[7][0] == '\x00' ? false : true };
+                sfSpec[7][0] == '\x00' ? false : true
+        };
 
         rxSfSpec = tempSfSpec;
 
@@ -4382,6 +4400,7 @@ void IEEE802154Mac::handleBcnTxTimer() {
             //  std::cout << std::hex << (0xFF &  txSfSpec.BO) << " ";
 
             // }
+            /**
             std::cout << "TXSFSPEC  " << endl;
             std::cout << std::hex << (0xFF & txSfSpec.BO) << endl;
             std::cout << std::hex << txSfSpec.BI << endl;
@@ -4395,7 +4414,7 @@ void IEEE802154Mac::handleBcnTxTimer() {
             a = txSfSpec.assoPmt ? 1 : 0;
             std::cout << std::hex << a << endl;
             std::cout << "TXSFSPEC  " << endl;
-            /*
+
              std::cout << "TXSFSPEC  " << endl;
              printHex( std::string(1, txSfSpec.BO));
              printHex(std::string(1,txSfSpec.BI));
@@ -4407,7 +4426,7 @@ void IEEE802154Mac::handleBcnTxTimer() {
              printHex(txSfSpec.assoPmt);
 
              std::cout << "TXSFSPEC FINE " << endl;
-             */
+             **/
 
             /*
              std::cout << "TXSFSPEC  " << endl;
@@ -5963,7 +5982,7 @@ std::string IEEE802154Mac::AEADDecypher(std::string cipher,
         // All is well - work with data
         cout << "Decrypted and Verified data. Ready for use." << endl;
         cout << endl;
-        cout << "DECIFRATURA rpdata: " << retrieved.data() << endl;
+       // cout << "DECIFRATURA rpdata: " << retrieved.data() << endl;
 
         return retrieved;
 
@@ -6061,7 +6080,9 @@ std::string IEEE802154Mac::secPacket(mpdu *frame, const char *s) {
     std::string adata, pdata;
 
     setAPDATA(&adata, &pdata, frame, s, true);
+    std::string cipherT = AEADCypher(adata, pdata);
 
+    /*
     std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
     std::cout << adata;
     std::cout << std::endl << std::endl;
@@ -6079,11 +6100,10 @@ std::string IEEE802154Mac::secPacket(mpdu *frame, const char *s) {
     printHex(pdata);
     std::cout << endl << endl;
 
-    std::string cipherT = AEADCypher(adata, pdata);
-
     std::cout << " TESTO CIFRATO IN HEX" << endl;
     printHex(cipherT);
     std::cout << endl << endl;
+    */
 
     return cipherT;
 
