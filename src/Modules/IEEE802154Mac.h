@@ -313,12 +313,17 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         void FSM_MCPS_DATA_request(phyState pStatus = phy_SUCCESS, MACenum mStatus = mac_SUCCESS);
         void resetTRX();
 
+        //funzioni di sicurezza
 
-        std::string AEADCypher(std::string adata, std::string pdata);
-        std::string AEADDecypher( std::string cypher,std::string radata);
+        std::string AEADCypher32(std::string adata, std::string pdata);
+        std::string AEADCypher64(std::string adata, std::string pdata);
+        std::string AEADCypher128(std::string adata, std::string pdata);
+        std::string AEADDecypher32( std::string cypher,std::string radata);
+        std::string AEADDecypher64( std::string cypher,std::string radata);
+        std::string AEADDecypher128( std::string cypher,std::string radata);
         void setAPDATA(std::string *adata, std::string *pdata, mpdu *frame, const char *s,bool encryption);
-        std::string secPacket(mpdu *frame, const char *s);
-        std::string secRecPacket(mpdu *frame, const char *s, std::string cipher);
+        std::string secPacket(mpdu *frame, const char *s, unsigned char secLv);
+        std::string secRecPacket(mpdu *frame, const char *s, std::string cipher, unsigned char secLv);
         void printHex(std::string text);
         std::vector<std::string> parserSecMessage(std::string str,char ch);
 

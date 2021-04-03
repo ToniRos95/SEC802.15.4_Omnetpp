@@ -55,7 +55,7 @@ packet mpdu
     unsigned short fcf=0;       // 16-Bit Frame Control Field
     bool isGTS = false;		    // Added extra for GTS logic
     bool isIndirect=false;      // Added extra for indirect transmissions
-    MICSec mic;
+    //MICSec mic;
     string payload;
     string chipherT;
        
@@ -66,6 +66,7 @@ packet beaconFrame extends mpdu
     SuperframeSpec sfSpec;                  // Superframe specifications
     GTSDescriptor gtsList[7];	
     PendingAddrFields paFields;             // includes numLong numShort and List
+    
 }
 
 packet beaconNotify

@@ -777,22 +777,17 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg) {
                 holdMe->setSqnr(AssoCommand->getSqnr());
                 holdMe->setByteLength(calcFrameByteLength(AssoCommand));
 
-
-
                 Ieee802154MacTaskType task = TP_MCPS_DATA_REQUEST;
                 taskP.taskStatus(task) = true;
-
-
 
                 // Associate Requests always direct to Coordinator
                 taskP.mcps_data_request_TxOption = DIRECT_TRANS;
                 taskP.taskStep(task)++; // advance to next task step
-                strcpy(taskP.taskFrFunc(task), "handle_PD_DATA_request");
+                strcpy
+                (taskP.taskFrFunc(task), "handle_PD_DATA_request");
                 ASSERT(txData == NULL);
                 txData = holdMe;
                 csmacaEntry('d');
-
-
 
                 delete (msg);    // fix for undisposed object message
 
@@ -1583,7 +1578,7 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
         } else {
 
             std::string encoded = secRecPacket(bcnFrame, bcnFrame->getName(),
-                    bcnFrame->getPayload());
+                    bcnFrame->getPayload(), bcnFrame->getAsh().secu.Seculevel);
 
             /**
              std::cout << " TESTO DECIFRATO IN HEX" << endl;
@@ -1648,14 +1643,12 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
              std::cout<< "decimalValue  " << str_hex << ": " << li_hex << '\n';
              */
 
-            SuperframeSpec tempSfSpec = { (unsigned char) sfSpec[0][0],
-                    bi,
-                    (unsigned char) sfSpec[2][0],
-                    sd,
+            SuperframeSpec tempSfSpec = { (unsigned char) sfSpec[0][0], bi,
+                    (unsigned char) sfSpec[2][0], sd,
                     (unsigned char) sfSpec[4][0],
-                     sfSpec[5][0] == '\x00' ? false : true,
-                     sfSpec[6][0] == '\x00' ? false : true,
-                     sfSpec[7][0] == '\x00' ? false : true };
+                            sfSpec[5][0] == '\x00' ? false : true,
+                            sfSpec[6][0] == '\x00' ? false : true,
+                            sfSpec[7][0] == '\x00' ? false : true };
 
             rxSfSpec = tempSfSpec;
 
@@ -3361,7 +3354,6 @@ void IEEE802154Mac::csmacaStart(bool firsttime, mpdu* frame, bool ackReq) {
     macEV
     << "[CSMA]: Backoff time after adjusting: " << wtime * 1000 << " ms \n";
     bool backoff = true;
-    std::cout << "HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 10\n";
 
     if (beaconEnabled) {
         if (firsttime) {
@@ -4341,7 +4333,9 @@ void IEEE802154Mac::handleBcnTxTimer() {
     /*
      * BEACON PACCHETTO
      *
-     *  fcs # frame control # sequence number # addressing field # ash # superframe specification # gts info # pending address # beacon payload
+     *  frame control # sequence number # addressing field # ash # superframe specification # gts info # pending address # beacon payload
+     *
+     *  //non mettiamo l'fcs perchè non va nè autenticato e nè cifrato
      *
      *  ash= security control * frame Count * key identifier
      *  addressing field= srcPANID * MACADDRESS src * destPANID * MACADDRESS dest
@@ -4439,30 +4433,28 @@ void IEEE802154Mac::handleBcnTxTimer() {
              << txSfSpec.assoPmt << endl;
              */
 
-            if (!(mpib.getMacSecurityEnabled())) {
-
-                tmpBcn->setSfSpec(txSfSpec);
-            }
-
-            // populate the GTS fields -- TODO more TBD when considering GTS
             for (int i = 0; i < 7; i++) {
                 tmpBcn->setGtsList(0, gtsList[i]);
             }
-            //pendingAddrFields
-            //tmpBcn->setPaFields(txPaFields);
 
-            // inizio sicurezza
-            //inserimento Mic
+            if (!(mpib.getMacSecurityEnabled())) {
 
-            if (mpib.getMacSecurityEnabled()) {
+                tmpBcn->setSfSpec(txSfSpec);
+            } else {
+
                 Ash assoAsh;
                 assoAsh.secu.Seculevel = mpib.getSeculevel();
                 tmpBcn->setAsh(assoAsh);
 
                 tmpBcn->setPayload(
-                        secPacket(tmpBcn->dup(), tmpBcn->getName()).c_str());
-
+                        secPacket(tmpBcn->dup(), tmpBcn->getName(),
+                                assoAsh.secu.Seculevel).c_str());
             }
+
+            // populate the GTS fields -- TODO more TBD when considering GTS
+
+            //pendingAddrFields
+            //tmpBcn->setPaFields(txPaFields);
 
             /**
 
@@ -5859,7 +5851,9 @@ void IEEE802154Mac::resetTRX() {
     genSetTrxState(t_state);
 }
 
-std::string IEEE802154Mac::AEADCypher(std::string adata, std::string pdata) {
+std::string IEEE802154Mac::AEADCypher32(std::string adata, std::string pdata) {
+
+    //std::cout << "PORCA MADONNACCIAAAAAAAAAAAAAAAAAAAAAA" << secuLevel;
 
     byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
             0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
@@ -5867,11 +5861,16 @@ std::string IEEE802154Mac::AEADCypher(std::string adata, std::string pdata) {
     byte iv[] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
             0x1a, 0x1b };
 
-    const int TAG_SIZE = 16;
-
     string cipher;
 
+    const int TAG_SIZE = 4;
+    /**
+    std::cout
+            << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: "
+            << TAG_SIZE << endl;
+**/
     try {
+
         CCM<AES, TAG_SIZE>::Encryption e;
         e.SetKeyWithIV(key, sizeof(key), iv, sizeof(iv));
         e.SpecifyDataLengths(adata.size(), pdata.size(), 0);
@@ -5911,7 +5910,306 @@ std::string IEEE802154Mac::AEADCypher(std::string adata, std::string pdata) {
 
 }
 
-std::string IEEE802154Mac::AEADDecypher(std::string cipher,
+std::string IEEE802154Mac::AEADCypher64(std::string adata, std::string pdata) {
+
+    //std::cout << "PORCA MADONNACCIAAAAAAAAAAAAAAAAAAAAAA" << secuLevel;
+
+    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
+            0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
+
+    byte iv[] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+            0x1a, 0x1b };
+
+    string cipher;
+
+    const int TAG_SIZE = 8;
+    /**
+     std::cout
+     << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: "
+     << TAG_SIZE << endl;
+     **/
+    try {
+
+        CCM<AES, TAG_SIZE>::Encryption e;
+        e.SetKeyWithIV(key, sizeof(key), iv, sizeof(iv));
+        e.SpecifyDataLengths(adata.size(), pdata.size(), 0);
+
+        AuthenticatedEncryptionFilter ef(e, new StringSink(cipher)); // AuthenticatedEncryptionFilter
+
+        // AuthenticatedEncryptionFilter::ChannelPut
+        //  defines two channels: DEFAULT_CHANNEL and AAD_CHANNEL
+        //   DEFAULT_CHANNEL is encrypted and authenticated
+        //   AAD_CHANNEL is authenticated
+
+        //ef.ChannelPut(AAD_CHANNEL, adata.)
+
+        ef.ChannelPut(AAD_CHANNEL,
+                reinterpret_cast<const unsigned char*>(adata.data()),
+                adata.size());
+        ef.ChannelMessageEnd(AAD_CHANNEL);
+
+        //ef.ChannelPut()
+
+        // Authenticated data *must* be pushed before
+        //  Confidential/Authenticated data
+        ef.ChannelPut(DEFAULT_CHANNEL,
+                reinterpret_cast<const unsigned char*>(pdata.data()),
+                pdata.size());
+        ef.ChannelMessageEnd(DEFAULT_CHANNEL);
+
+        return cipher;
+
+    } catch (CryptoPP::Exception& e) {
+        cerr << "Caught Exception..." << endl;
+        cerr << e.what() << endl;
+        cerr << endl;
+
+        return 0;
+    }
+
+}
+
+std::string IEEE802154Mac::AEADCypher128(std::string adata, std::string pdata) {
+
+    //std::cout << "PORCA MADONNACCIAAAAAAAAAAAAAAAAAAAAAA" << secuLevel;
+
+    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
+            0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
+
+    byte iv[] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+            0x1a, 0x1b };
+
+    string cipher;
+
+    const int TAG_SIZE = 16;
+    /**std::cout
+            << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: "
+            << TAG_SIZE << endl;
+**/
+    try {
+
+        CCM<AES, TAG_SIZE>::Encryption e;
+        e.SetKeyWithIV(key, sizeof(key), iv, sizeof(iv));
+        e.SpecifyDataLengths(adata.size(), pdata.size(), 0);
+
+        AuthenticatedEncryptionFilter ef(e, new StringSink(cipher)); // AuthenticatedEncryptionFilter
+
+        // AuthenticatedEncryptionFilter::ChannelPut
+        //  defines two channels: DEFAULT_CHANNEL and AAD_CHANNEL
+        //   DEFAULT_CHANNEL is encrypted and authenticated
+        //   AAD_CHANNEL is authenticated
+
+        //ef.ChannelPut(AAD_CHANNEL, adata.)
+
+        ef.ChannelPut(AAD_CHANNEL,
+                reinterpret_cast<const unsigned char*>(adata.data()),
+                adata.size());
+        ef.ChannelMessageEnd(AAD_CHANNEL);
+
+        //ef.ChannelPut()
+
+        // Authenticated data *must* be pushed before
+        //  Confidential/Authenticated data
+        ef.ChannelPut(DEFAULT_CHANNEL,
+                reinterpret_cast<const unsigned char*>(pdata.data()),
+                pdata.size());
+        ef.ChannelMessageEnd(DEFAULT_CHANNEL);
+
+        return cipher;
+
+    } catch (CryptoPP::Exception& e) {
+        cerr << "Caught Exception..." << endl;
+        cerr << e.what() << endl;
+        cerr << endl;
+
+        return 0;
+    }
+
+}
+
+std::string IEEE802154Mac::AEADDecypher32(std::string cipher,
+        std::string radata) {
+
+    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
+            0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
+
+    byte iv[] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+            0x1a, 0x1b };
+
+    string encoded;
+
+    const int TAG_SIZE = 4;
+
+    try {
+
+        // Break the cipher text out into it's
+        //  components: Encrypted Data and MAC Tag Value
+        string enc = cipher.substr(0, cipher.length() - TAG_SIZE);
+        string tag = cipher.substr(cipher.length() - TAG_SIZE);
+
+        // Sanity checks
+        //assert( cipher.size() == enc.size() + tag.size() );
+        //assert( enc.size() == pdata.size() );
+        //assert( TAG_SIZE == tag.size() );
+
+        CCM<AES, TAG_SIZE>::Decryption d;
+        d.SetKeyWithIV(key, sizeof(key), iv, sizeof(iv));
+        d.SpecifyDataLengths(radata.size(), enc.size(), 0);
+
+        // The object *will* throw an exception
+        //  during decryption\verification _if_
+        //  verification fails.
+        AuthenticatedDecryptionFilter df(d, NULL,
+                AuthenticatedDecryptionFilter::MAC_AT_BEGIN
+                        | AuthenticatedDecryptionFilter::THROW_EXCEPTION); // AuthenticatedDecryptionFilter
+
+        // The order of the following calls are important
+        //  when using the MAC_AT_BEGIN flag
+        df.ChannelPut(DEFAULT_CHANNEL,
+                reinterpret_cast<const unsigned char*>(tag.data()), tag.size());
+        df.ChannelPut(AAD_CHANNEL,
+                reinterpret_cast<const unsigned char*>(radata.data()),
+                radata.size());
+        df.ChannelPut(DEFAULT_CHANNEL,
+                reinterpret_cast<const unsigned char*>(enc.data()), enc.size());
+
+        // If the object throws, it will most likely occur
+        //   during ChannelMessageEnd()
+        df.ChannelMessageEnd(AAD_CHANNEL);
+        df.ChannelMessageEnd(DEFAULT_CHANNEL);
+
+        // If the object does not throw, here's the last
+        //  opportunity to check the status of the
+        //  data's integrity (both ADATA and PDATA)
+        //  before use.
+        bool b = false;
+        b = df.GetLastResult();
+        //assert( true == b );
+
+        // Remove data from the channel
+        string retrieved;
+        int n = -1;
+
+        // Plain text (recovered from enc.data())
+        df.SetRetrievalChannel(DEFAULT_CHANNEL);
+        n = df.MaxRetrievable();
+        retrieved.resize(n);
+
+        if (n > 0) {
+            df.Get((byte*) retrieved.data(), n);
+        }
+        //assert( rpdata == pdata );
+
+        // All is well - work with data
+        cout << "Decrypted and Verified data. Ready for use." << endl;
+        cout << endl;
+        // cout << "DECIFRATURA rpdata: " << retrieved.data() << endl;
+
+        return retrieved;
+
+    } catch (CryptoPP::Exception& e) {
+        cerr << "Caught Exception..." << endl;
+        cerr << e.what() << endl;
+        cerr << endl;
+
+        return 0;
+
+    }
+
+}
+
+std::string IEEE802154Mac::AEADDecypher64(std::string cipher,
+        std::string radata) {
+
+    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
+            0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
+
+    byte iv[] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+            0x1a, 0x1b };
+
+    string encoded;
+
+    const int TAG_SIZE = 8;
+
+    try {
+
+        // Break the cipher text out into it's
+        //  components: Encrypted Data and MAC Tag Value
+        string enc = cipher.substr(0, cipher.length() - TAG_SIZE);
+        string tag = cipher.substr(cipher.length() - TAG_SIZE);
+
+        // Sanity checks
+        //assert( cipher.size() == enc.size() + tag.size() );
+        //assert( enc.size() == pdata.size() );
+        //assert( TAG_SIZE == tag.size() );
+
+        CCM<AES, TAG_SIZE>::Decryption d;
+        d.SetKeyWithIV(key, sizeof(key), iv, sizeof(iv));
+        d.SpecifyDataLengths(radata.size(), enc.size(), 0);
+
+        // The object *will* throw an exception
+        //  during decryption\verification _if_
+        //  verification fails.
+        AuthenticatedDecryptionFilter df(d, NULL,
+                AuthenticatedDecryptionFilter::MAC_AT_BEGIN
+                        | AuthenticatedDecryptionFilter::THROW_EXCEPTION); // AuthenticatedDecryptionFilter
+
+        // The order of the following calls are important
+        //  when using the MAC_AT_BEGIN flag
+        df.ChannelPut(DEFAULT_CHANNEL,
+                reinterpret_cast<const unsigned char*>(tag.data()), tag.size());
+        df.ChannelPut(AAD_CHANNEL,
+                reinterpret_cast<const unsigned char*>(radata.data()),
+                radata.size());
+        df.ChannelPut(DEFAULT_CHANNEL,
+                reinterpret_cast<const unsigned char*>(enc.data()), enc.size());
+
+        // If the object throws, it will most likely occur
+        //   during ChannelMessageEnd()
+        df.ChannelMessageEnd(AAD_CHANNEL);
+        df.ChannelMessageEnd(DEFAULT_CHANNEL);
+
+        // If the object does not throw, here's the last
+        //  opportunity to check the status of the
+        //  data's integrity (both ADATA and PDATA)
+        //  before use.
+        bool b = false;
+        b = df.GetLastResult();
+        //assert( true == b );
+
+        // Remove data from the channel
+        string retrieved;
+        int n = -1;
+
+        // Plain text (recovered from enc.data())
+        df.SetRetrievalChannel(DEFAULT_CHANNEL);
+        n = df.MaxRetrievable();
+        retrieved.resize(n);
+
+        if (n > 0) {
+            df.Get((byte*) retrieved.data(), n);
+        }
+        //assert( rpdata == pdata );
+
+        // All is well - work with data
+        cout << "Decrypted and Verified data. Ready for use." << endl;
+        cout << endl;
+        // cout << "DECIFRATURA rpdata: " << retrieved.data() << endl;
+
+        return retrieved;
+
+    } catch (CryptoPP::Exception& e) {
+        cerr << "Caught Exception..." << endl;
+        cerr << e.what() << endl;
+        cerr << endl;
+
+        return 0;
+
+    }
+
+}
+
+std::string IEEE802154Mac::AEADDecypher128(std::string cipher,
         std::string radata) {
 
     byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
@@ -6012,7 +6310,9 @@ void IEEE802154Mac::setAPDATA(std::string *atemp, std::string *ptemp,
         /*
          * BEACON PACCHETTO
          *
-         * fcs # frame control # sequence number # addressing field # ash # superframe specification # gts info # pending address # beacon payload
+         *  frame control # sequence number # addressing field # ash # superframe specification # gts info # pending address # beacon payload
+         *
+         *  //nel pacchetto manca fcs che non va nè autenticato e ne cifrato
          *
          *  ash= security control * frame Count * key identifier
          *  addressing field= srcPANID * MACADDRESS src * destPANID * MACADDRESS dest
@@ -6080,12 +6380,28 @@ void IEEE802154Mac::setAPDATA(std::string *atemp, std::string *ptemp,
 
 }
 
-std::string IEEE802154Mac::secPacket(mpdu *frame, const char *s) {
+std::string IEEE802154Mac::secPacket(mpdu *frame, const char *s,
+        unsigned char secuLevel) {
 
     std::string adata, pdata;
+    std::string cipherT;
 
     setAPDATA(&adata, &pdata, frame, s, true);
-    std::string cipherT = AEADCypher(adata, pdata);
+
+    switch (secuLevel) {
+    case 5:
+        cipherT = AEADCypher32(adata, pdata);
+        break;
+    case 6:
+        cipherT = AEADCypher64(adata, pdata);
+        break;
+    case 7:
+        cipherT = AEADCypher128(adata, pdata);
+        break;
+    default:
+        std::cout << "secuLevel : " << secuLevel << endl;
+        throw cRuntimeError("secuLevel error");
+    }
 
     /*
      std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
@@ -6115,14 +6431,28 @@ std::string IEEE802154Mac::secPacket(mpdu *frame, const char *s) {
 }
 
 std::string IEEE802154Mac::secRecPacket(mpdu *frame, const char *s,
-        std::string cipher) {
+        std::string cipher, unsigned char secuLevel) {
 
     std::string radata;
     std::string null;
+    std::string decipherT;
 
     setAPDATA(&radata, &null, frame, s, false);
 
-    std::string decipherT = AEADDecypher(cipher, radata);
+    switch (secuLevel) {
+    case 5:
+        decipherT = AEADDecypher32(cipher, radata);
+        break;
+    case 6:
+        decipherT = AEADDecypher64(cipher, radata);
+        break;
+    case 7:
+        decipherT = AEADDecypher128(cipher, radata);
+        break;
+    default:
+        std::cout << "secuLevel : " << secuLevel << endl;
+        throw cRuntimeError("secuLevel error");
+    }
 
     return decipherT;
 
@@ -6143,7 +6473,7 @@ vector<string> IEEE802154Mac::parserSecMessage(std::string str, char ch) {
     string next;
     vector<string> result;
 
-    // For each character in the string
+// For each character in the string
     for (string::const_iterator it = str.begin(); it != str.end(); it++) {
         // If we've hit the terminal character
         if (*it == ch) {
