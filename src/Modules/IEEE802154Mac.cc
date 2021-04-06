@@ -21,6 +21,13 @@
 #include "MICSec.h"
 #include "cryptopp/ccm.h"
 #include "cryptopp/aes.h"
+#include "cryptopp/cbcmac.h"
+#include "cryptopp/cryptlib.h"
+#include "cryptopp/secblock.h"
+#include "cryptopp/osrng.h"
+#include "cryptopp/files.h"
+#include "cryptopp/cmac.h"
+#include "cryptopp/hex.h"
 
 #include <iostream>
 #include <iomanip>
@@ -4437,11 +4444,13 @@ void IEEE802154Mac::handleBcnTxTimer() {
                 tmpBcn->setGtsList(0, gtsList[i]);
             }
 
+            //DOBBIAMO FIXARE STA PARTE PERCHÈ COSÌ QUANDO AUTENTICHIAMO NON VA BENE
+
             if (!(mpib.getMacSecurityEnabled())) {
 
                 tmpBcn->setSfSpec(txSfSpec);
             } else {
-
+                tmpBcn->setSfSpec(txSfSpec);
                 Ash assoAsh;
                 assoAsh.secu.Seculevel = mpib.getSeculevel();
                 tmpBcn->setAsh(assoAsh);
@@ -4450,6 +4459,8 @@ void IEEE802154Mac::handleBcnTxTimer() {
                         secPacket(tmpBcn->dup(), tmpBcn->getName(),
                                 assoAsh.secu.Seculevel).c_str());
             }
+
+            //FIXARE LA PARTE DI SOPRA!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             // populate the GTS fields -- TODO more TBD when considering GTS
 
@@ -5851,6 +5862,72 @@ void IEEE802154Mac::resetTRX() {
     genSetTrxState(t_state);
 }
 
+void prova() {
+
+    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
+                0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
+
+    string mac, plain = "CMAC Test";
+    HexEncoder encoder(new FileSink(cout));
+
+    /*********************************\
+        \*********************************/
+
+    // Pretty print key
+    cout << "key: ";
+    encoder.Put(key, sizeof(key));
+    encoder.MessageEnd();
+    cout << endl;
+
+    cout << "plain text: ";
+    encoder.Put((const byte*) plain.data(), plain.size());
+    encoder.MessageEnd();
+    cout << endl;
+
+    /*********************************\
+        \*********************************/
+
+    try {
+        CBC_MAC<AES> cmac(key, sizeof(key));
+        cmac.Update((const byte*) plain.data(), plain.size());
+
+        mac.resize(cmac.DigestSize());
+        cmac.Final((byte*) &mac[0]);
+    } catch (const CryptoPP::Exception& e) {
+        cerr << e.what() << endl;
+        exit(1);
+    }
+
+    /*********************************\
+        \*********************************/
+
+    // Pretty print
+    cout << "cmac: ";
+    encoder.Put((const byte*) mac.data(), mac.size());
+    encoder.MessageEnd();
+    //cout << mac;
+    cout << endl;
+
+    /*********************************\
+        \*********************************/
+
+    // Verify
+    try {
+        CBC_MAC<AES> cmac(key, sizeof(key));
+        cmac.Update((const byte*) plain.data(), plain.size());
+
+        // Call Verify() instead of Final()
+        bool verified = cmac.Verify((byte*) &mac[0]);
+        if (!verified)
+            throw Exception(Exception::DATA_INTEGRITY_CHECK_FAILED,
+                    "CMAC: message MAC not valid");
+
+        cout << "Verified message MAC" << endl;
+    } catch (const CryptoPP::Exception& e) {
+        cerr << e.what() << endl;
+        exit(1);
+    }
+}
 std::string IEEE802154Mac::AEADCypher32(std::string adata, std::string pdata) {
 
     //std::cout << "PORCA MADONNACCIAAAAAAAAAAAAAAAAAAAAAA" << secuLevel;
@@ -5865,10 +5942,10 @@ std::string IEEE802154Mac::AEADCypher32(std::string adata, std::string pdata) {
 
     const int TAG_SIZE = 4;
     /**
-    std::cout
-            << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: "
-            << TAG_SIZE << endl;
-**/
+     std::cout
+     << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: "
+     << TAG_SIZE << endl;
+     **/
     try {
 
         CCM<AES, TAG_SIZE>::Encryption e;
@@ -5983,9 +6060,9 @@ std::string IEEE802154Mac::AEADCypher128(std::string adata, std::string pdata) {
 
     const int TAG_SIZE = 16;
     /**std::cout
-            << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: "
-            << TAG_SIZE << endl;
-**/
+     << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: "
+     << TAG_SIZE << endl;
+     **/
     try {
 
         CCM<AES, TAG_SIZE>::Encryption e;
@@ -6300,6 +6377,93 @@ std::string IEEE802154Mac::AEADDecypher128(std::string cipher,
 
 }
 
+std::string CBCMACAuth() {
+
+    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
+            0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
+
+    //AutoSeededRandomPool prng;
+
+    //SecByteBlock key(AES::DEFAULT_KEYLENGTH);
+    //prng.GenerateBlock(key, key.size());
+
+    string plain = "CMAC Test";
+    string mac, encoded;
+
+    /*********************************\
+    \*********************************/
+
+    // Pretty print key
+    encoded.clear();
+    StringSource ss1(key, sizeof(key), true,
+            new HexEncoder(new StringSink(encoded)) // HexEncoder
+                    );// StringSource
+
+    cout << "key: " << encoded << endl;
+    cout << "plain text: " << plain << endl;
+
+    /*********************************\
+    \*********************************/
+
+    try {
+        CBC_MAC<AES> cmac(key, sizeof(key));
+
+        StringSource ss2(plain, true, new HashFilter(cmac, new StringSink(mac)) // HashFilter
+                );// StringSource
+    } catch (const CryptoPP::Exception& e) {
+        cerr << e.what() << endl;
+        exit(1);
+    }
+
+    /*********************************\
+    \*********************************/
+
+    // Pretty print
+    encoded.clear();
+    StringSource ss3(mac, true, new HexEncoder(new StringSink(encoded)) // HexEncoder
+            );// StringSource
+
+    cout << "cmac: " << encoded << endl;
+
+}
+
+std::string CBCMACVerify() {
+
+    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
+            0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
+
+    //AutoSeededRandomPool prng;
+
+    //SecByteBlock key(AES::DEFAULT_KEYLENGTH);
+    //prng.GenerateBlock(key, key.size());
+
+    string plain = "CMAC Test";
+    string mac, encoded;
+
+    // Pretty print key
+    encoded.clear();
+    StringSource ss1(key, sizeof(key), true,
+            new HexEncoder(new StringSink(encoded)) // HexEncoder
+                    );// StringSource
+
+    cout << "key: " << encoded << endl;
+    cout << "plain text: " << plain << endl;
+
+    try {
+        CBC_MAC<AES> cmac(key, sizeof(key));
+        const int flags = HashVerificationFilter::THROW_EXCEPTION
+                | HashVerificationFilter::HASH_AT_END;
+
+        StringSource ss(plain + mac, true,
+                new HashVerificationFilter(cmac, NULL, flags)); // StringSource
+
+        cout << "Verified message" << endl;
+    } catch (const CryptoPP::Exception& e) {
+        cerr << e.what() << endl;
+    }
+
+}
+
 void IEEE802154Mac::setAPDATA(std::string *atemp, std::string *ptemp,
         mpdu *frame, const char *s, bool encryption) {
 
@@ -6389,6 +6553,8 @@ std::string IEEE802154Mac::secPacket(mpdu *frame, const char *s,
     setAPDATA(&adata, &pdata, frame, s, true);
 
     switch (secuLevel) {
+    case 1:
+        prova();
     case 5:
         cipherT = AEADCypher32(adata, pdata);
         break;
@@ -6440,6 +6606,8 @@ std::string IEEE802154Mac::secRecPacket(mpdu *frame, const char *s,
     setAPDATA(&radata, &null, frame, s, false);
 
     switch (secuLevel) {
+    case 1:
+        prova();
     case 5:
         decipherT = AEADDecypher32(cipher, radata);
         break;
@@ -6501,6 +6669,10 @@ vector<string> IEEE802154Mac::parserSecMessage(std::string str, char ch) {
      }
      */
 }
+
+
+
+/***************************** DA QUI IN POI È ROBA LORO *******************************/
 
 void IEEE802154Mac::finish() {
     double currentTime = simTime().dbl();
