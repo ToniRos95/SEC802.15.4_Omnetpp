@@ -1,22 +1,3 @@
-//
-// Copyright (C) 2008 Feng Chen         (original IEEE 802.15.4 CSMA-CA MAC model)
-// Copyright (C) 2013 Matti Schnurbusch (adaptation and extension of Feng Chen's model)
-// Copyright (C) 2015 Michael Kirsche   (clean-up, ported and extended for INET 2.x)
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU Lesser General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with this program; if not, see <http://www.gnu.org/licenses/>.
-//
-
 #include "IEEE802154Mac.h"
 #include "MICSec.h"
 #include "cryptopp/ccm.h"
@@ -28,13 +9,11 @@
 #include "cryptopp/files.h"
 #include "cryptopp/cmac.h"
 #include "cryptopp/hex.h"
-
-#include <iostream>
-#include <iomanip>
-
 #include "cryptopp/modes.h"
 #include "cryptopp/filters.h"
 
+#include <iostream>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <cstring>
@@ -1578,94 +1557,107 @@ void IEEE802154Mac::handleBeacon(mpdu *frame) {
         // se la sicurezza del pacchetto non è abilitata, l'algoritmo prenderà il campo rxSfSpec dal pacchetto in chiaro. altrimenti
         // è già settata in precedenza
 
-        if (!(mpib.getMacSecurityEnabled())) {
+        //if (!(mpib.getMacSecurityEnabled())) {
 
-            rxSfSpec = bcnFrame->getSfSpec();
+        //Non siamo sicurissimi che il securityEnabled debba essere preso dall'mpib
+        if (mpib.getMacSecurityEnabled()) {
 
-        } else {
 
-            std::string encoded = secRecPacket(bcnFrame, bcnFrame->getName(),
-                    bcnFrame->getPayload(), bcnFrame->getAsh().secu.Seculevel);
 
             /**
              std::cout << " TESTO DECIFRATO IN HEX" << endl;
              printHex(encoded);
              std::cout << endl;
+
+
+             //std::string authenticated;
+             //std::string null;
+             //std::cout << " PARSER" << endl;
+             //setAPDATA(&authenticated,&null,bcnFrame, bcnFrame->getName(),false);
              **/
 
-            //std::string authenticated;
-            //std::string null;
-            std::vector<string> result;
-            //std::cout << " PARSER" << endl;
-            //setAPDATA(&authenticated,&null,bcnFrame, bcnFrame->getName(),false);
-            result = parserSecMessage(encoded, '\x23');
+            if (bcnFrame->getAsh().secu.Seculevel == 1
+                    || bcnFrame->getAsh().secu.Seculevel == 2
+                    || bcnFrame->getAsh().secu.Seculevel == 3) {
 
-            std::vector<string> sfSpec = parserSecMessage(result[0], '\x2a');
+                secRecPacket(bcnFrame);
 
-            /**
-             std::cout << "RXSFSPEC  " << endl;
-             printHex(sfSpec[0]);
-             printHex(sfSpec[1]);
-             printHex(sfSpec[2]);
-             printHex(sfSpec[3]);
-             printHex(sfSpec[4]);
-             printHex(sfSpec[5]);
-             printHex(sfSpec[6]);
-             printHex(sfSpec[7]);
-             std::cout << "RXSFSPEC FINE " << endl;
+                rxSfSpec = bcnFrame->getSfSpec();
 
+            } else if (bcnFrame->getAsh().secu.Seculevel == 5
+                    || bcnFrame->getAsh().secu.Seculevel == 6
+                    || bcnFrame->getAsh().secu.Seculevel == 7) {
 
-             std::string str_dec = "1987520";
-             std::string str_hex = "2f04e009";
-             std::string str_bin = "-11101001100100111010";
-             std::string str_auto = "0x7fffff";
+                std::string encoded = secRecPacket(bcnFrame);
+                std::vector<string> result = parserSecMessage(encoded, '\x23');
+                std::vector<string> sfSpec = parserSecMessage(result[0],
+                        '\x2a');
 
-             std::string::size_type sz;   // alias of size_t
-
-             long li_dec = std::stol (str_dec,&sz);
-             int li_hex = std::stoi (str_hex,nullptr,16);
-             long li_bin = std::stol (str_bin,nullptr,2);
-             long li_auto = std::stol (str_auto,nullptr,0);
-
-             std::cout << str_dec << ": " << li_dec << '\n';
-             std::cout << str_hex << ": " << li_hex << '\n';
-             std::cout << str_bin << ": " << li_bin << '\n';
-             std::cout << str_auto << ": " << li_auto << '\n';
-             **/
-            /**
-             std::istringstream converter("f000");
-             unsigned int value;
-             converter >> std::hex >> value;
-             **/
-            unsigned int bi;
-            unsigned int sd;
-            std::istringstream(sfSpec[1]) >> std::hex >> bi;
-            std::istringstream(sfSpec[3]) >> std::hex >> sd;
-
-            /**
-             std::string str_hex = "f000";
-             long li_hex = std::stol (str_hex,nullptr,16);
+                /**
+                 std::cout << "RXSFSPEC  " << endl;
+                 printHex(sfSpec[0]);
+                 printHex(sfSpec[1]);
+                 printHex(sfSpec[2]);
+                 printHex(sfSpec[3]);
+                 printHex(sfSpec[4]);
+                 printHex(sfSpec[5]);
+                 printHex(sfSpec[6]);
+                 printHex(sfSpec[7]);
+                 std::cout << "RXSFSPEC FINE " << endl;
 
 
-             std::cout<< "decimalValue  " << str_hex << ": " << li_hex << '\n';
-             */
+                 std::string str_dec = "1987520";
+                 std::string str_hex = "2f04e009";
+                 std::string str_bin = "-11101001100100111010";
+                 std::string str_auto = "0x7fffff";
 
-            SuperframeSpec tempSfSpec = { (unsigned char) sfSpec[0][0], bi,
-                    (unsigned char) sfSpec[2][0], sd,
-                    (unsigned char) sfSpec[4][0],
-                            sfSpec[5][0] == '\x00' ? false : true,
-                            sfSpec[6][0] == '\x00' ? false : true,
-                            sfSpec[7][0] == '\x00' ? false : true };
+                 std::string::size_type sz;   // alias of size_t
 
-            rxSfSpec = tempSfSpec;
+                 long li_dec = std::stol (str_dec,&sz);
+                 int li_hex = std::stoi (str_hex,nullptr,16);
+                 long li_bin = std::stol (str_bin,nullptr,2);
+                 long li_auto = std::stol (str_auto,nullptr,0);
+
+                 std::cout << str_dec << ": " << li_dec << '\n';
+                 std::cout << str_hex << ": " << li_hex << '\n';
+                 std::cout << str_bin << ": " << li_bin << '\n';
+                 std::cout << str_auto << ": " << li_auto << '\n';
+                 **/
+                /**
+                 std::istringstream converter("f000");
+                 unsigned int value;
+                 converter >> std::hex >> value;
+                 **/
+                unsigned int bi;
+                unsigned int sd;
+                std::istringstream(sfSpec[1]) >> std::hex >> bi;
+                std::istringstream(sfSpec[3]) >> std::hex >> sd;
+
+                /**
+                 std::string str_hex = "f000";
+                 long li_hex = std::stol (str_hex,nullptr,16);
+
+
+                 std::cout<< "decimalValue  " << str_hex << ": " << li_hex << '\n';
+                 */
+
+                SuperframeSpec tempSfSpec = { (unsigned char) sfSpec[0][0], bi,
+                        (unsigned char) sfSpec[2][0], sd,
+                        (unsigned char) sfSpec[4][0],
+                                sfSpec[5][0] == '\x00' ? false : true,
+                                sfSpec[6][0] == '\x00' ? false : true,
+                                sfSpec[7][0] == '\x00' ? false : true };
+
+                rxSfSpec = tempSfSpec;
+
+            }
 
             //std::cout << "RXSFSPEC  " << endl;
             //std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
-            /*
-             * # *
-             *
-             * */
 
+        } else {
+
+            rxSfSpec = bcnFrame->getSfSpec();
         }
 
         rxBO = rxSfSpec.BO;
@@ -4446,18 +4438,28 @@ void IEEE802154Mac::handleBcnTxTimer() {
 
             //DOBBIAMO FIXARE STA PARTE PERCHÈ COSÌ QUANDO AUTENTICHIAMO NON VA BENE
 
-            if (!(mpib.getMacSecurityEnabled())) {
+            tmpBcn->setSfSpec(txSfSpec);
 
-                tmpBcn->setSfSpec(txSfSpec);
-            } else {
-                tmpBcn->setSfSpec(txSfSpec);
+            if (mpib.getMacSecurityEnabled()) {
                 Ash assoAsh;
                 assoAsh.secu.Seculevel = mpib.getSeculevel();
                 tmpBcn->setAsh(assoAsh);
 
-                tmpBcn->setPayload(
-                        secPacket(tmpBcn->dup(), tmpBcn->getName(),
-                                assoAsh.secu.Seculevel).c_str());
+                if (assoAsh.secu.Seculevel == 1 || assoAsh.secu.Seculevel == 2
+                        || assoAsh.secu.Seculevel == 3) {
+
+                    tmpBcn->setMic(secPacket(tmpBcn->dup()).c_str());
+
+                } else if (assoAsh.secu.Seculevel == 5
+                        || assoAsh.secu.Seculevel == 6
+                        || assoAsh.secu.Seculevel == 7) {
+
+                    tmpBcn->setPayload(secPacket(tmpBcn->dup()).c_str());
+                    SuperframeSpec nullSfspec;
+                    tmpBcn->setSfSpec(nullSfspec);
+
+                }
+
             }
 
             //FIXARE LA PARTE DI SOPRA!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -5862,72 +5864,8 @@ void IEEE802154Mac::resetTRX() {
     genSetTrxState(t_state);
 }
 
-void prova() {
+/***************************************** DA QUI IN POI ABBIAMO CODIFICATO LA SICUREZZA ********************************************/
 
-    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
-                0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
-
-    string mac, plain = "CMAC Test";
-    HexEncoder encoder(new FileSink(cout));
-
-    /*********************************\
-        \*********************************/
-
-    // Pretty print key
-    cout << "key: ";
-    encoder.Put(key, sizeof(key));
-    encoder.MessageEnd();
-    cout << endl;
-
-    cout << "plain text: ";
-    encoder.Put((const byte*) plain.data(), plain.size());
-    encoder.MessageEnd();
-    cout << endl;
-
-    /*********************************\
-        \*********************************/
-
-    try {
-        CBC_MAC<AES> cmac(key, sizeof(key));
-        cmac.Update((const byte*) plain.data(), plain.size());
-
-        mac.resize(cmac.DigestSize());
-        cmac.Final((byte*) &mac[0]);
-    } catch (const CryptoPP::Exception& e) {
-        cerr << e.what() << endl;
-        exit(1);
-    }
-
-    /*********************************\
-        \*********************************/
-
-    // Pretty print
-    cout << "cmac: ";
-    encoder.Put((const byte*) mac.data(), mac.size());
-    encoder.MessageEnd();
-    //cout << mac;
-    cout << endl;
-
-    /*********************************\
-        \*********************************/
-
-    // Verify
-    try {
-        CBC_MAC<AES> cmac(key, sizeof(key));
-        cmac.Update((const byte*) plain.data(), plain.size());
-
-        // Call Verify() instead of Final()
-        bool verified = cmac.Verify((byte*) &mac[0]);
-        if (!verified)
-            throw Exception(Exception::DATA_INTEGRITY_CHECK_FAILED,
-                    "CMAC: message MAC not valid");
-
-        cout << "Verified message MAC" << endl;
-    } catch (const CryptoPP::Exception& e) {
-        cerr << e.what() << endl;
-        exit(1);
-    }
-}
 std::string IEEE802154Mac::AEADCypher32(std::string adata, std::string pdata) {
 
     //std::cout << "PORCA MADONNACCIAAAAAAAAAAAAAAAAAAAAAA" << secuLevel;
@@ -5941,11 +5879,11 @@ std::string IEEE802154Mac::AEADCypher32(std::string adata, std::string pdata) {
     string cipher;
 
     const int TAG_SIZE = 4;
-    /**
+
      std::cout
      << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: "
      << TAG_SIZE << endl;
-     **/
+
     try {
 
         CCM<AES, TAG_SIZE>::Encryption e;
@@ -6000,11 +5938,11 @@ std::string IEEE802154Mac::AEADCypher64(std::string adata, std::string pdata) {
     string cipher;
 
     const int TAG_SIZE = 8;
-    /**
+
      std::cout
      << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: "
      << TAG_SIZE << endl;
-     **/
+
     try {
 
         CCM<AES, TAG_SIZE>::Encryption e;
@@ -6059,10 +5997,10 @@ std::string IEEE802154Mac::AEADCypher128(std::string adata, std::string pdata) {
     string cipher;
 
     const int TAG_SIZE = 16;
-    /**std::cout
+    std::cout
      << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: "
      << TAG_SIZE << endl;
-     **/
+
     try {
 
         CCM<AES, TAG_SIZE>::Encryption e;
@@ -6377,57 +6315,29 @@ std::string IEEE802154Mac::AEADDecypher128(std::string cipher,
 
 }
 
-std::string CBCMACAuth() {
+std::string IEEE802154Mac::CBCMACAuth(std::string plain) {
 
     byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
             0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
 
-    //AutoSeededRandomPool prng;
-
-    //SecByteBlock key(AES::DEFAULT_KEYLENGTH);
-    //prng.GenerateBlock(key, key.size());
-
-    string plain = "CMAC Test";
-    string mac, encoded;
-
-    /*********************************\
-    \*********************************/
-
-    // Pretty print key
-    encoded.clear();
-    StringSource ss1(key, sizeof(key), true,
-            new HexEncoder(new StringSink(encoded)) // HexEncoder
-                    );// StringSource
-
-    cout << "key: " << encoded << endl;
-    cout << "plain text: " << plain << endl;
-
-    /*********************************\
-    \*********************************/
+    string mac;
 
     try {
-        CBC_MAC<AES> cmac(key, sizeof(key));
+        CBC_MAC<AES> cbcmac(key, sizeof(key));
+        cbcmac.Update((const byte*) plain.data(), plain.size());
 
-        StringSource ss2(plain, true, new HashFilter(cmac, new StringSink(mac)) // HashFilter
-                );// StringSource
+        mac.resize(cbcmac.DigestSize());
+        cbcmac.Final((byte*) &mac[0]);
     } catch (const CryptoPP::Exception& e) {
         cerr << e.what() << endl;
         exit(1);
     }
 
-    /*********************************\
-    \*********************************/
-
-    // Pretty print
-    encoded.clear();
-    StringSource ss3(mac, true, new HexEncoder(new StringSink(encoded)) // HexEncoder
-            );// StringSource
-
-    cout << "cmac: " << encoded << endl;
+    return mac;
 
 }
 
-std::string CBCMACVerify() {
+void IEEE802154Mac::CBCMACVerify(std::string plain, std::string mac) {
 
     byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
             0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
@@ -6437,39 +6347,32 @@ std::string CBCMACVerify() {
     //SecByteBlock key(AES::DEFAULT_KEYLENGTH);
     //prng.GenerateBlock(key, key.size());
 
-    string plain = "CMAC Test";
-    string mac, encoded;
-
-    // Pretty print key
-    encoded.clear();
-    StringSource ss1(key, sizeof(key), true,
-            new HexEncoder(new StringSink(encoded)) // HexEncoder
-                    );// StringSource
-
-    cout << "key: " << encoded << endl;
-    cout << "plain text: " << plain << endl;
-
+    // Verify
     try {
-        CBC_MAC<AES> cmac(key, sizeof(key));
-        const int flags = HashVerificationFilter::THROW_EXCEPTION
-                | HashVerificationFilter::HASH_AT_END;
+        CBC_MAC<AES> cbcmac(key, sizeof(key));
+        cbcmac.Update((const byte*) plain.data(), plain.size());
 
-        StringSource ss(plain + mac, true,
-                new HashVerificationFilter(cmac, NULL, flags)); // StringSource
+        // Call Verify() instead of Final()
+        bool verified = cbcmac.Verify((byte*) &mac[0]);
+        if (!verified)
+            throw Exception(Exception::DATA_INTEGRITY_CHECK_FAILED,
+                    "CBC_MAC: message MAC not valid");
 
-        cout << "Verified message" << endl;
+        cout << "Verified message MAC" << endl;
     } catch (const CryptoPP::Exception& e) {
         cerr << e.what() << endl;
+        exit(1);
     }
+    return;
 
 }
 
-void IEEE802154Mac::setAPDATA(std::string *atemp, std::string *ptemp,
-        mpdu *frame, const char *s, bool encryption) {
+void IEEE802154Mac::setAPDATA(std::string *adata, std::string *pdata,
+        mpdu *frame, bool encryption) {
 
-    std::string *adata = atemp;
+    //std::string *adata = atemp;
 
-    if (strcmp(s, "Ieee802154BEACONTimer") == 0) {
+    if (strcmp(frame->getName(), "Ieee802154BEACONTimer") == 0) {
 
         /*
          * BEACON PACCHETTO
@@ -6510,28 +6413,29 @@ void IEEE802154Mac::setAPDATA(std::string *atemp, std::string *ptemp,
         *adata += '#';
 
         if (encryption) {
-            std::string *pdata = ptemp;
+            //std::string *pdata = ptemp;
             std::stringstream stream;
+            SuperframeSpec tmp = tmpBcn->getSfSpec();
 
-            *pdata += txSfSpec.BO;
+            *pdata += tmp.BO;
             *pdata += '*';
-            stream << std::hex << txSfSpec.BI;
+            stream << std::hex << tmp.BI;
             *pdata += stream.str();
             stream.str("");
             *pdata += '*';
-            *pdata += txSfSpec.SO;
+            *pdata += tmp.SO;
             *pdata += '*';
-            stream << std::hex << txSfSpec.SD;
+            stream << std::hex << tmp.SD;
             *pdata += stream.str();
             stream.str("");
             *pdata += '*';
-            *pdata += txSfSpec.finalCap;
+            *pdata += tmp.finalCap;
             *pdata += '*';
-            *pdata += txSfSpec.battLifeExt;
+            *pdata += tmp.battLifeExt;
             *pdata += '*';
-            *pdata += txSfSpec.panCoor;
+            *pdata += tmp.panCoor;
             *pdata += '*';
-            *pdata += txSfSpec.assoPmt;
+            *pdata += tmp.assoPmt;
             *pdata += '#';
             //gts
             *pdata += '#';
@@ -6544,28 +6448,115 @@ void IEEE802154Mac::setAPDATA(std::string *atemp, std::string *ptemp,
 
 }
 
-std::string IEEE802154Mac::secPacket(mpdu *frame, const char *s,
-        unsigned char secuLevel) {
+void IEEE802154Mac::setADATA(std::string *adata, mpdu *frame) {
 
+    //std::string *adata = atemp;
+
+    if (strcmp(frame->getName(), "Ieee802154BEACONTimer") == 0) {
+
+        /*
+         * BEACON PACCHETTO
+         *
+         *  frame control # sequence number # addressing field # ash # superframe specification # gts info # pending address # beacon payload
+         *
+         *  //nel pacchetto manca fcs che non va nè autenticato e ne cifrato
+         *
+         *  ash= security control * frame Count * key identifier
+         *  addressing field= srcPANID * MACADDRESS src * destPANID * MACADDRESS dest
+         *  superframe specification= BO * BI * SO * SD * finalCap * battLifeExt * panCoor * assoPmt
+         *
+         * */
+
+        beaconFrame *tmpBcn = check_and_cast<beaconFrame *>(frame);
+        SuperframeSpec tmp = tmpBcn->getSfSpec();
+        std::stringstream stream;
+
+        *adata += tmpBcn->getFcf();
+        *adata += '#';
+        //frame control
+        *adata += '#';
+        *adata += tmpBcn->getSqnr();
+        *adata += '#';
+        *adata += tmpBcn->getSrcPANid();
+        *adata += '*';
+        *adata += tmpBcn->getSrc().str();
+        *adata += '*';
+        *adata += tmpBcn->getDestPANid();
+        *adata += '*';
+        *adata += tmpBcn->getDest().str();
+        *adata += '#';
+        *adata += tmpBcn->getAsh().secu.Seculevel;
+        *adata += tmpBcn->getAsh().secu.KeyIdMode;
+        *adata += '*';
+        *adata += tmpBcn->getAsh().FrameCount;
+        *adata += '*';
+        *adata += tmpBcn->getAsh().KeyIdentifier.KeySource;
+        *adata += tmpBcn->getAsh().KeyIdentifier.KeyIndex;
+        *adata += '#';
+        *adata += tmp.BO;
+        *adata += '*';
+        stream << std::hex << tmp.BI;
+        *adata += stream.str();
+        stream.str("");
+        *adata += '*';
+        *adata += tmp.SO;
+        *adata += '*';
+        stream << std::hex << tmp.SD;
+        *adata += stream.str();
+        stream.str("");
+        *adata += '*';
+        *adata += tmp.finalCap;
+        *adata += '*';
+        *adata += tmp.battLifeExt;
+        *adata += '*';
+        *adata += tmp.panCoor;
+        *adata += '*';
+        *adata += tmp.assoPmt;
+        *adata += '#';
+        //gts
+        *adata += '#';
+        // pending field
+        *adata += '#';
+        *adata += tmpBcn->getPayload();
+    }
+    return;
+
+}
+
+std::string IEEE802154Mac::secPacket(mpdu *frame) {
+
+    /**adata è la parte di messaggio che viene mandata in chiaro e deve essere autenticata
+     * pdata è la parte di messaggio che deve essere cifrata
+     *
+     */
     std::string adata, pdata;
-    std::string cipherT;
+    std::string result;
 
-    setAPDATA(&adata, &pdata, frame, s, true);
-
-    switch (secuLevel) {
+    switch (frame->getAsh().secu.Seculevel) {
     case 1:
-        prova();
+        setADATA(&adata, frame);
+        result = CBCMACAuth(adata);
+        break;
+    case 2:
+
+        break;
+    case 3:
+
+        break;
     case 5:
-        cipherT = AEADCypher32(adata, pdata);
+        setAPDATA(&adata, &pdata, frame, true);
+        result = AEADCypher32(adata, pdata);
         break;
     case 6:
-        cipherT = AEADCypher64(adata, pdata);
+        setAPDATA(&adata, &pdata, frame, true);
+        result = AEADCypher64(adata, pdata);
         break;
     case 7:
-        cipherT = AEADCypher128(adata, pdata);
+        setAPDATA(&adata, &pdata, frame, true);
+        result = AEADCypher128(adata, pdata);
         break;
     default:
-        std::cout << "secuLevel : " << secuLevel << endl;
+        std::cout << "secuLevel : " << frame->getAsh().secu.Seculevel << endl;
         throw cRuntimeError("secuLevel error");
     }
 
@@ -6573,54 +6564,76 @@ std::string IEEE802154Mac::secPacket(mpdu *frame, const char *s,
      std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
      std::cout << adata;
      std::cout << std::endl << std::endl;
-
      std::cout << " TESTO ADATA IN HEX" << endl;
      printHex(adata);
      std::cout << endl << endl;
-
      std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
      << std::endl;
      std::cout << pdata;
      std::cout << std::endl << std::endl;
-
      std::cout << " TESTO IN CHIARO IN HEX" << endl;
      printHex(pdata);
      std::cout << endl << endl;
-
      std::cout << " TESTO CIFRATO IN HEX" << endl;
      printHex(cipherT);
      std::cout << endl << endl;
      */
 
-    return cipherT;
+    return result;
 
 }
 
-std::string IEEE802154Mac::secRecPacket(mpdu *frame, const char *s,
-        std::string cipher, unsigned char secuLevel) {
+std::string IEEE802154Mac::secRecPacket(mpdu *frame) {
 
     std::string radata;
     std::string null;
+    std::string cipher = frame->getPayload();
     std::string decipherT;
 
-    setAPDATA(&radata, &null, frame, s, false);
-
-    switch (secuLevel) {
+    switch (frame->getAsh().secu.Seculevel) {
     case 1:
-        prova();
+        setADATA(&radata, frame);
+        CBCMACVerify(radata, frame->getMic());
+        break;
+    case 2:
+        break;
+    case 3:
+        break;
     case 5:
+        setAPDATA(&radata, &null, frame, false);
         decipherT = AEADDecypher32(cipher, radata);
         break;
     case 6:
+        setAPDATA(&radata, &null, frame, false);
         decipherT = AEADDecypher64(cipher, radata);
         break;
     case 7:
+        setAPDATA(&radata, &null, frame, false);
         decipherT = AEADDecypher128(cipher, radata);
         break;
     default:
-        std::cout << "secuLevel : " << secuLevel << endl;
+        std::cout << "secuLevel : " << frame->getAsh().secu.Seculevel << endl;
         throw cRuntimeError("secuLevel error");
     }
+
+    /*
+     std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
+     std::cout << adata;
+     std::cout << std::endl << std::endl;
+     std::cout << " TESTO ADATA IN HEX" << endl;
+     printHex(adata);
+     std::cout << endl << endl;
+     std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
+     << std::endl;
+     std::cout << pdata;
+     std::cout << std::endl << std::endl;
+     std::cout << " TESTO IN CHIARO IN HEX" << endl;
+     printHex(pdata);
+     std::cout << endl << endl;
+     std::cout << " TESTO CIFRATO IN HEX" << endl;
+     printHex(cipherT);
+     std::cout << endl << endl;
+     */
 
     return decipherT;
 
@@ -6669,8 +6682,6 @@ vector<string> IEEE802154Mac::parserSecMessage(std::string str, char ch) {
      }
      */
 }
-
-
 
 /***************************** DA QUI IN POI È ROBA LORO *******************************/
 

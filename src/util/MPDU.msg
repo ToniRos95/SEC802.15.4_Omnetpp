@@ -57,7 +57,7 @@ packet mpdu
     bool isIndirect=false;      // Added extra for indirect transmissions
     //MICSec mic;
     string payload;
-    string chipherT;
+    string mic;
        
 }
 

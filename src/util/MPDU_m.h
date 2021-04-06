@@ -41,7 +41,7 @@
  *     bool isIndirect = false;      // Added extra for indirect transmissions
  *     //MICSec mic;
  *     string payload;
- *     string chipherT;
+ *     string mic;
  * 
  * }
  * </pre>
@@ -60,7 +60,7 @@ class mpdu : public ::cPacket
     bool isGTS_var;
     bool isIndirect_var;
     opp_string payload_var;
-    opp_string chipherT_var;
+    opp_string mic_var;
 
   private:
     void copy(const mpdu& other);
@@ -104,8 +104,8 @@ class mpdu : public ::cPacket
     virtual void setIsIndirect(bool isIndirect);
     virtual const char * getPayload() const;
     virtual void setPayload(const char * payload);
-    virtual const char * getChipherT() const;
-    virtual void setChipherT(const char * chipherT);
+    virtual const char * getMic() const;
+    virtual void setMic(const char * mic);
 };
 
 inline void doPacking(cCommBuffer *b, mpdu& obj) {obj.parsimPack(b);}

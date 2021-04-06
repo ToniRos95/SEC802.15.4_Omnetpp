@@ -306,13 +306,13 @@ protected:
     std::string AEADDecypher32(std::string cypher, std::string radata);
     std::string AEADDecypher64(std::string cypher, std::string radata);
     std::string AEADDecypher128(std::string cypher, std::string radata);
-    std::string CBCMACAuth();
-    std::string CBCMACVerify();
+    std::string CBCMACAuth(std::string plain);
+    void CBCMACVerify(std::string plain, std::string mac);
     void setAPDATA(std::string *adata, std::string *pdata, mpdu *frame,
-            const char *s, bool encryption);
-    std::string secPacket(mpdu *frame, const char *s, unsigned char secLv);
-    std::string secRecPacket(mpdu *frame, const char *s, std::string cipher,
-            unsigned char secLv);
+            bool encryption);
+    void setADATA(std::string *adata, mpdu *frame);
+    std::string secPacket(mpdu *frame);
+    std::string secRecPacket(mpdu *frame);
     void printHex(std::string text);
     std::vector<std::string> parserSecMessage(std::string str, char ch);
 
