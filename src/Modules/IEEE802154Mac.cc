@@ -6256,7 +6256,9 @@ std::string IEEE802154Mac::AEADCypher32(std::string adata, std::string pdata)
 
     string cipher;
 
-    //HexEncoder encoder();
+    std::stringstream temp;
+
+    HexEncoder encoder(new FileSink(temp));
 
     const int TAG_SIZE = 4;
 
@@ -6288,7 +6290,8 @@ std::string IEEE802154Mac::AEADCypher32(std::string adata, std::string pdata)
         ef.ChannelPut(DEFAULT_CHANNEL, reinterpret_cast<const unsigned char*>(pdata.data()), pdata.size());
         ef.ChannelMessageEnd(DEFAULT_CHANNEL);
 
-        return cipher;
+        encoder.Put((const byte *) cipher.data(), cipher.size());
+        return temp.str();
 
     }
     catch (CryptoPP::Exception& e)
@@ -6312,6 +6315,10 @@ std::string IEEE802154Mac::AEADCypher64(std::string adata, std::string pdata)
     byte iv[] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b };
 
     string cipher;
+
+    std::stringstream temp;
+
+    HexEncoder encoder(new FileSink(temp));
 
     const int TAG_SIZE = 8;
 
@@ -6343,7 +6350,8 @@ std::string IEEE802154Mac::AEADCypher64(std::string adata, std::string pdata)
         ef.ChannelPut(DEFAULT_CHANNEL, reinterpret_cast<const unsigned char*>(pdata.data()), pdata.size());
         ef.ChannelMessageEnd(DEFAULT_CHANNEL);
 
-        return cipher;
+        encoder.Put((const byte *) cipher.data(), cipher.size());
+        return temp.str();
 
     }
     catch (CryptoPP::Exception& e)
@@ -6367,6 +6375,10 @@ std::string IEEE802154Mac::AEADCypher128(std::string adata, std::string pdata)
     byte iv[] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b };
 
     string cipher;
+
+    std::stringstream temp;
+
+    HexEncoder encoder(new FileSink(temp));
 
     const int TAG_SIZE = 16;
     std::cout << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: " << TAG_SIZE << endl;
@@ -6397,7 +6409,8 @@ std::string IEEE802154Mac::AEADCypher128(std::string adata, std::string pdata)
         ef.ChannelPut(DEFAULT_CHANNEL, reinterpret_cast<const unsigned char*>(pdata.data()), pdata.size());
         ef.ChannelMessageEnd(DEFAULT_CHANNEL);
 
-        return cipher;
+        encoder.Put((const byte *) cipher.data(), cipher.size());
+        return temp.str();
 
     }
     catch (CryptoPP::Exception& e)
@@ -6914,7 +6927,7 @@ void IEEE802154Mac::CBCMACVerify32(std::string plain, std::string mac)
         CBC_MAC<AES> cbcmac(key, sizeof(key));
         cbcmac.Update((const byte*) plain.data(), plain.size());
         // Call Verify() instead of Final()
-        bool verified = cbcmac.TruncatedVerify((byte*) &mac[0],4);
+        bool verified = cbcmac.TruncatedVerify((byte*) &mac[0], 4);
         if (!verified)
         {
             /**
@@ -6987,7 +7000,7 @@ void IEEE802154Mac::CBCMACVerify64(std::string plain, std::string mac)
         CBC_MAC<AES> cbcmac(key, sizeof(key));
         cbcmac.Update((const byte*) plain.data(), plain.size());
         // Call Verify() instead of Final()
-        bool verified = cbcmac.TruncatedVerify((byte*) &mac[0],8);
+        bool verified = cbcmac.TruncatedVerify((byte*) &mac[0], 8);
         if (!verified)
         {
             /**
@@ -7060,7 +7073,7 @@ void IEEE802154Mac::CBCMACVerify128(std::string plain, std::string mac)
         CBC_MAC<AES> cbcmac(key, sizeof(key));
         cbcmac.Update((const byte*) plain.data(), plain.size());
         // Call Verify() instead of Final()
-        bool verified = cbcmac.TruncatedVerify((byte*) &mac[0],16);
+        bool verified = cbcmac.TruncatedVerify((byte*) &mac[0], 16);
         if (!verified)
         {
             /**
@@ -7339,7 +7352,7 @@ std::string IEEE802154Mac::secRecPacket(mpdu *frame)
 
     std::string radata;
     std::string null;
-    std::string cipher = frame->getPayload();
+    //std::string cipher = frame->getPayload();
     std::string decipherT;
     std::stringstream temp;
 
@@ -7368,15 +7381,18 @@ std::string IEEE802154Mac::secRecPacket(mpdu *frame)
             break;
         case 5:
             setAPDATA(&radata, &null, frame, false);
-            decipherT = AEADDecypher32(cipher, radata);
+            decoder.Put((const byte *) frame->getPayload(),strlen(frame->getPayload()));
+            decipherT = AEADDecypher32(temp.str(), radata);
             break;
         case 6:
             setAPDATA(&radata, &null, frame, false);
-            decipherT = AEADDecypher64(cipher, radata);
+            decoder.Put((const byte *) frame->getPayload(),strlen(frame->getPayload()));
+            decipherT = AEADDecypher64(temp.str(), radata);
             break;
         case 7:
             setAPDATA(&radata, &null, frame, false);
-            decipherT = AEADDecypher128(cipher, radata);
+            decoder.Put((const byte *) frame->getPayload(),strlen(frame->getPayload()));
+            decipherT = AEADDecypher128(temp.str(), radata);
             break;
         default:
             std::cout << "secuLevel : " << frame->getAsh().secu.Seculevel << endl;
