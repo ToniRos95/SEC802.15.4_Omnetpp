@@ -306,8 +306,12 @@ protected:
     std::string AEADDecypher32(std::string cypher, std::string radata);
     std::string AEADDecypher64(std::string cypher, std::string radata);
     std::string AEADDecypher128(std::string cypher, std::string radata);
-    std::string CBCMACAuth(std::string plain);
-    void CBCMACVerify(std::string plain, std::string mac);
+    std::string CBCMACAuth32(std::string plain);
+    std::string CBCMACAuth64(std::string plain);
+    std::string CBCMACAuth128(std::string plain);
+    void CBCMACVerify32(std::string plain, std::string mac);
+    void CBCMACVerify64(std::string plain, std::string mac);
+    void CBCMACVerify128(std::string plain, std::string mac);
     void setAPDATA(std::string *adata, std::string *pdata, mpdu *frame,
             bool encryption);
     void setADATA(std::string *adata, mpdu *frame);

@@ -6256,6 +6256,8 @@ std::string IEEE802154Mac::AEADCypher32(std::string adata, std::string pdata)
 
     string cipher;
 
+    //HexEncoder encoder();
+
     const int TAG_SIZE = 4;
 
     std::cout << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: " << TAG_SIZE << endl;
@@ -6670,7 +6672,7 @@ std::string IEEE802154Mac::AEADDecypher128(std::string cipher, std::string radat
 
 }
 
-std::string IEEE802154Mac::CBCMACAuth(std::string plain)
+std::string IEEE802154Mac::CBCMACAuth32(std::string plain)
 {
 
     byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
@@ -6678,60 +6680,221 @@ std::string IEEE802154Mac::CBCMACAuth(std::string plain)
     string mac;
 
     stringstream temp;
-
+    HexEncoder stamp(new FileSink(cout));
     HexEncoder encoder(new FileSink(temp));
-    HexDecoder decoder(new FileSink(cout));
+    //HexDecoder decoder(new FileSink(cout));
 
     try
     {
         CBC_MAC<AES> cbcmac(key, sizeof(key));
         cbcmac.Update((const byte*) plain.data(), plain.size());
 
-        mac.resize(cbcmac.DigestSize());
+        mac.resize(4);
         cbcmac.Final((byte*) &mac[0]);
 
-        std::cout << "Testo in chiaro (" << plain.size() << " bytes)" << std::endl;
-        encoder.Put((const byte*) plain.data(), plain.size());
-        encoder.MessageEnd();
+        std::cout << "MAC (" << mac.size() << " bytes)" << std::endl;
+        stamp.Put((const byte*) mac.data(), mac.size());
+        stamp.MessageEnd();
         std::cout << std::endl << std::endl;
 
-        std::cout << "MAC (" << plain.size() << " bytes)" << std::endl;
-        encoder.Put((const byte*) mac.data(), mac.size());
-        encoder.MessageEnd();
-        std::cout << std::endl << std::endl;
+        /**
+         std::cout << "Testo in chiaro (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) plain.data(), plain.size());
+         encoder.MessageEnd();
+         decoder.Put((const byte*) temp.str().data(), temp.str().size());
+         decoder.MessageEnd();
+         temp.str("");
+         std::cout << std::endl << std::endl;
+
+         std::cout << "MAC (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) mac.data(), mac.size());
+         encoder.MessageEnd();
+         decoder.Put((const byte*) temp.str().data(), temp.str().size());
+         decoder.MessageEnd();
+         std::cout << std::endl << std::endl;
+         **/
 
     }
     catch (const CryptoPP::Exception& e)
     {
 
-        std::cout << "Testo in chiaro (" << plain.size() << " bytes)" << std::endl;
-        encoder.Put((const byte*) plain.data(), plain.size());
-        encoder.MessageEnd();
-        decoder.Put((const byte*)temp.str().data(), temp.str().size());
-        decoder.MessageEnd();
-        std::cout << std::endl << std::endl;
+        /**
+         std::cout << "Testo in chiaro (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) plain.data(), plain.size());
+         encoder.MessageEnd();
+         decoder.Put((const byte*) temp.str().data(), temp.str().size());
+         decoder.MessageEnd();
+         std::cout << std::endl << std::endl;
 
-        std::cout << "MAC (" << plain.size() << " bytes)" << std::endl;
-        encoder.Put((const byte*) mac.data(), mac.size());
-        encoder.MessageEnd();
-        decoder.Put((const byte*)temp.str().data(), temp.str().size());
-        decoder.MessageEnd();
-        std::cout << std::endl << std::endl;
+         std::cout << "MAC (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) mac.data(), mac.size());
+         encoder.MessageEnd();
+         decoder.Put((const byte*) temp.str().data(), temp.str().size());
+         decoder.MessageEnd();
+         std::cout << std::endl << std::endl;
+         **/
 
         cerr << e.what() << endl;
         exit(1);
     }
 
-    return mac;
+    encoder.Put((const byte*) mac.data(), mac.size());
+
+    return temp.str();
 
 }
 
-void IEEE802154Mac::CBCMACVerify(std::string plain, std::string mac)
+std::string IEEE802154Mac::CBCMACAuth64(std::string plain)
+{
+
+    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
+
+    string mac;
+
+    stringstream temp;
+    HexEncoder stamp(new FileSink(cout));
+    HexEncoder encoder(new FileSink(temp));
+    //HexDecoder decoder(new FileSink(cout));
+
+    try
+    {
+        CBC_MAC<AES> cbcmac(key, sizeof(key));
+        cbcmac.Update((const byte*) plain.data(), plain.size());
+
+        mac.resize(8);
+        cbcmac.Final((byte*) &mac[0]);
+
+        std::cout << "MAC (" << mac.size() << " bytes)" << std::endl;
+        stamp.Put((const byte*) mac.data(), mac.size());
+        stamp.MessageEnd();
+        std::cout << std::endl << std::endl;
+
+        /**
+         std::cout << "Testo in chiaro (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) plain.data(), plain.size());
+         encoder.MessageEnd();
+         decoder.Put((const byte*) temp.str().data(), temp.str().size());
+         decoder.MessageEnd();
+         temp.str("");
+         std::cout << std::endl << std::endl;
+
+         std::cout << "MAC (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) mac.data(), mac.size());
+         encoder.MessageEnd();
+         decoder.Put((const byte*) temp.str().data(), temp.str().size());
+         decoder.MessageEnd();
+         std::cout << std::endl << std::endl;
+         **/
+
+    }
+    catch (const CryptoPP::Exception& e)
+    {
+
+        /**
+         std::cout << "Testo in chiaro (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) plain.data(), plain.size());
+         encoder.MessageEnd();
+         decoder.Put((const byte*) temp.str().data(), temp.str().size());
+         decoder.MessageEnd();
+         std::cout << std::endl << std::endl;
+
+         std::cout << "MAC (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) mac.data(), mac.size());
+         encoder.MessageEnd();
+         decoder.Put((const byte*) temp.str().data(), temp.str().size());
+         decoder.MessageEnd();
+         std::cout << std::endl << std::endl;
+         **/
+
+        cerr << e.what() << endl;
+        exit(1);
+    }
+
+    encoder.Put((const byte*) mac.data(), mac.size());
+
+    return temp.str();
+
+}
+
+std::string IEEE802154Mac::CBCMACAuth128(std::string plain)
+{
+
+    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
+
+    string mac;
+
+    stringstream temp;
+    HexEncoder stamp(new FileSink(cout));
+    HexEncoder encoder(new FileSink(temp));
+    //HexDecoder decoder(new FileSink(cout));
+
+    try
+    {
+        CBC_MAC<AES> cbcmac(key, sizeof(key));
+        cbcmac.Update((const byte*) plain.data(), plain.size());
+
+        mac.resize(16);
+        cbcmac.Final((byte*) &mac[0]);
+
+        std::cout << "MAC (" << mac.size() << " bytes)" << std::endl;
+        stamp.Put((const byte*) mac.data(), mac.size());
+        stamp.MessageEnd();
+        std::cout << std::endl << std::endl;
+
+        /**
+         std::cout << "Testo in chiaro (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) plain.data(), plain.size());
+         encoder.MessageEnd();
+         decoder.Put((const byte*) temp.str().data(), temp.str().size());
+         decoder.MessageEnd();
+         temp.str("");
+         std::cout << std::endl << std::endl;
+
+         std::cout << "MAC (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) mac.data(), mac.size());
+         encoder.MessageEnd();
+         decoder.Put((const byte*) temp.str().data(), temp.str().size());
+         decoder.MessageEnd();
+         std::cout << std::endl << std::endl;
+         **/
+
+    }
+    catch (const CryptoPP::Exception& e)
+    {
+
+        /**
+         std::cout << "Testo in chiaro (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) plain.data(), plain.size());
+         encoder.MessageEnd();
+         decoder.Put((const byte*) temp.str().data(), temp.str().size());
+         decoder.MessageEnd();
+         std::cout << std::endl << std::endl;
+
+         std::cout << "MAC (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) mac.data(), mac.size());
+         encoder.MessageEnd();
+         decoder.Put((const byte*) temp.str().data(), temp.str().size());
+         decoder.MessageEnd();
+         std::cout << std::endl << std::endl;
+         **/
+
+        cerr << e.what() << endl;
+        exit(1);
+    }
+
+    encoder.Put((const byte*) mac.data(), mac.size());
+
+    return temp.str();
+
+}
+
+void IEEE802154Mac::CBCMACVerify32(std::string plain, std::string mac)
 {
 
     byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
 
     //stringstream temp;
+
     HexEncoder encoder(new FileSink(cout));
 
     //AutoSeededRandomPool prng;
@@ -6740,44 +6903,198 @@ void IEEE802154Mac::CBCMACVerify(std::string plain, std::string mac)
     //prng.GenerateBlock(key, key.size());
 
     // Verify
+
+    std::cout << "MAC  verify (" << mac.size() << " bytes)" << std::endl;
+    encoder.Put((const byte *) mac.data(), mac.size());
+    encoder.MessageEnd();
+    std::cout << std::endl << std::endl;
+
     try
     {
         CBC_MAC<AES> cbcmac(key, sizeof(key));
         cbcmac.Update((const byte*) plain.data(), plain.size());
-
         // Call Verify() instead of Final()
-        bool verified = cbcmac.Verify((byte*) &mac[0]);
+        bool verified = cbcmac.TruncatedVerify((byte*) &mac[0],4);
         if (!verified)
         {
+            /**
+             std::cout << "Testo in chiaro Verify (" << plain.size() << " bytes)" << std::endl;
+             encoder.Put((const byte*) plain.data(), plain.size());
+             encoder.MessageEnd();
+             //std::cout << temp.str();
+             std::cout << std::endl << std::endl;
 
-            std::cout << "Testo in chiaro Verify (" << plain.size() << " bytes)" << std::endl;
-            encoder.Put((const byte*) plain.data(), plain.size());
-            encoder.MessageEnd();
-            //std::cout << temp.str();
-            std::cout << std::endl << std::endl;
-
-            std::cout << "MAC Verify (" << mac.size() << " bytes)" << std::endl;
-            encoder.Put((const byte*) mac.data(), mac.size());
-            encoder.MessageEnd();
-           // std::cout << temp.str();
-            std::cout << std::endl << std::endl;
+             std::cout << "MAC Verify (" << mac.size() << " bytes)" << std::endl;
+             encoder.Put((const byte*) mac.data(), mac.size());
+             encoder.MessageEnd();
+             // std::cout << temp.str();
+             std::cout << std::endl << std::endl;
+             **/
 
             throw Exception(Exception::DATA_INTEGRITY_CHECK_FAILED, "CBC_MAC: message MAC not valid");
 
         }
 
-        std::cout << "Testo in chiaro Verify (" << plain.size() << " bytes)" << std::endl;
-        encoder.Put((const byte*) plain.data(), plain.size());
-        encoder.MessageEnd();
-        //std::cout << temp.str();
-        //temp.str("");
-        std::cout << std::endl << std::endl;
+        /**
+         std::cout << "Testo in chiaro Verify (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) plain.data(), plain.size());
+         encoder.MessageEnd();
+         //std::cout << temp.str();
+         //temp.str("");
+         std::cout << std::endl << std::endl;
 
-        std::cout << "MAC Verify (" << mac.size() << " bytes)" << std::endl;
-        encoder.Put((const byte*) mac.data(), mac.size());
-        encoder.MessageEnd();
-        //std::cout << temp.str();
-        std::cout << std::endl << std::endl;
+         std::cout << "MAC Verify (" << mac.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) mac.data(), mac.size());
+         encoder.MessageEnd();
+         //std::cout << temp.str();
+         std::cout << std::endl << std::endl;
+         **/
+
+        cout << "Verified message MAC" << endl;
+    }
+    catch (const CryptoPP::Exception& e)
+    {
+        cerr << e.what() << endl;
+        exit(1);
+    }
+    return;
+
+}
+
+void IEEE802154Mac::CBCMACVerify64(std::string plain, std::string mac)
+{
+
+    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
+
+    //stringstream temp;
+
+    HexEncoder encoder(new FileSink(cout));
+
+    //AutoSeededRandomPool prng;
+
+    //SecByteBlock key(AES::DEFAULT_KEYLENGTH);
+    //prng.GenerateBlock(key, key.size());
+
+    // Verify
+
+    std::cout << "MAC  verify (" << mac.size() << " bytes)" << std::endl;
+    encoder.Put((const byte *) mac.data(), mac.size());
+    encoder.MessageEnd();
+    std::cout << std::endl << std::endl;
+
+    try
+    {
+        CBC_MAC<AES> cbcmac(key, sizeof(key));
+        cbcmac.Update((const byte*) plain.data(), plain.size());
+        // Call Verify() instead of Final()
+        bool verified = cbcmac.TruncatedVerify((byte*) &mac[0],8);
+        if (!verified)
+        {
+            /**
+             std::cout << "Testo in chiaro Verify (" << plain.size() << " bytes)" << std::endl;
+             encoder.Put((const byte*) plain.data(), plain.size());
+             encoder.MessageEnd();
+             //std::cout << temp.str();
+             std::cout << std::endl << std::endl;
+
+             std::cout << "MAC Verify (" << mac.size() << " bytes)" << std::endl;
+             encoder.Put((const byte*) mac.data(), mac.size());
+             encoder.MessageEnd();
+             // std::cout << temp.str();
+             std::cout << std::endl << std::endl;
+             **/
+
+            throw Exception(Exception::DATA_INTEGRITY_CHECK_FAILED, "CBC_MAC: message MAC not valid");
+
+        }
+
+        /**
+         std::cout << "Testo in chiaro Verify (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) plain.data(), plain.size());
+         encoder.MessageEnd();
+         //std::cout << temp.str();
+         //temp.str("");
+         std::cout << std::endl << std::endl;
+
+         std::cout << "MAC Verify (" << mac.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) mac.data(), mac.size());
+         encoder.MessageEnd();
+         //std::cout << temp.str();
+         std::cout << std::endl << std::endl;
+         **/
+
+        cout << "Verified message MAC" << endl;
+    }
+    catch (const CryptoPP::Exception& e)
+    {
+        cerr << e.what() << endl;
+        exit(1);
+    }
+    return;
+
+}
+
+void IEEE802154Mac::CBCMACVerify128(std::string plain, std::string mac)
+{
+
+    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
+
+    //stringstream temp;
+
+    HexEncoder encoder(new FileSink(cout));
+
+    //AutoSeededRandomPool prng;
+
+    //SecByteBlock key(AES::DEFAULT_KEYLENGTH);
+    //prng.GenerateBlock(key, key.size());
+
+    // Verify
+
+    std::cout << "MAC  verify (" << mac.size() << " bytes)" << std::endl;
+    encoder.Put((const byte *) mac.data(), mac.size());
+    encoder.MessageEnd();
+    std::cout << std::endl << std::endl;
+
+    try
+    {
+        CBC_MAC<AES> cbcmac(key, sizeof(key));
+        cbcmac.Update((const byte*) plain.data(), plain.size());
+        // Call Verify() instead of Final()
+        bool verified = cbcmac.TruncatedVerify((byte*) &mac[0],16);
+        if (!verified)
+        {
+            /**
+             std::cout << "Testo in chiaro Verify (" << plain.size() << " bytes)" << std::endl;
+             encoder.Put((const byte*) plain.data(), plain.size());
+             encoder.MessageEnd();
+             //std::cout << temp.str();
+             std::cout << std::endl << std::endl;
+
+             std::cout << "MAC Verify (" << mac.size() << " bytes)" << std::endl;
+             encoder.Put((const byte*) mac.data(), mac.size());
+             encoder.MessageEnd();
+             // std::cout << temp.str();
+             std::cout << std::endl << std::endl;
+             **/
+
+            throw Exception(Exception::DATA_INTEGRITY_CHECK_FAILED, "CBC_MAC: message MAC not valid");
+
+        }
+
+        /**
+         std::cout << "Testo in chiaro Verify (" << plain.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) plain.data(), plain.size());
+         encoder.MessageEnd();
+         //std::cout << temp.str();
+         //temp.str("");
+         std::cout << std::endl << std::endl;
+
+         std::cout << "MAC Verify (" << mac.size() << " bytes)" << std::endl;
+         encoder.Put((const byte*) mac.data(), mac.size());
+         encoder.MessageEnd();
+         //std::cout << temp.str();
+         std::cout << std::endl << std::endl;
+         **/
 
         cout << "Verified message MAC" << endl;
     }
@@ -6964,14 +7281,18 @@ std::string IEEE802154Mac::secPacket(mpdu *frame)
     {
         case 1:
             setADATA(&adata, frame);
-            strncpy(&result[0],&CBCMACAuth(adata)[0],16);
-            //result = CBCMACAuth(adata);
+            //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
+            result = CBCMACAuth32(adata);
             break;
         case 2:
-
+            setADATA(&adata, frame);
+            //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
+            result = CBCMACAuth64(adata);
             break;
         case 3:
-
+            setADATA(&adata, frame);
+            //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
+            result = CBCMACAuth128(adata);
             break;
         case 5:
             setAPDATA(&adata, &pdata, frame, true);
@@ -7020,16 +7341,30 @@ std::string IEEE802154Mac::secRecPacket(mpdu *frame)
     std::string null;
     std::string cipher = frame->getPayload();
     std::string decipherT;
+    std::stringstream temp;
+
+    HexDecoder decoder(new FileSink(temp));
 
     switch (frame->getAsh().secu.Seculevel)
     {
         case 1:
             setADATA(&radata, frame);
-            CBCMACVerify(radata,frame->getMic());
+            decoder.Put((const byte *) frame->getMic(), 8);
+            //std::cout << temp.str();
+            CBCMACVerify32(radata, temp.str());
+
             break;
         case 2:
+            setADATA(&radata, frame);
+            decoder.Put((const byte *) frame->getMic(), 16);
+            //std::cout << temp.str();
+            CBCMACVerify64(radata, temp.str());
             break;
         case 3:
+            setADATA(&radata, frame);
+            decoder.Put((const byte *) frame->getMic(), 32);
+            //std::cout << temp.str();
+            CBCMACVerify128(radata, temp.str());
             break;
         case 5:
             setAPDATA(&radata, &null, frame, false);
