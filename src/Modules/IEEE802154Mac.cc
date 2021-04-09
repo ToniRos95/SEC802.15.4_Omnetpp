@@ -568,8 +568,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                 strcpy
                 (taskP.taskFrFunc(task), "handle_PD_DATA_request");
                 ASSERT(txData == NULL);
-                txData = data;
-                csmacaEntry('d');
+                //txData = data;
+                //csmacaEntry('d');
                 break;
             }
 
@@ -584,8 +584,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                 strcpy
                 (taskP.taskFrFunc(task), "handle_PD_DATA_request");
                 ASSERT(txData == NULL);
-                txData = data;
-                csmacaEntry('d');
+                //txData = data;
+                //csmacaEntry('d');
                 break;
             }
 
@@ -600,8 +600,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                 strcpy
                 (taskP.taskFrFunc(task), "handle_PD_DATA_request");
                 ASSERT(txGTS == NULL);
-                txGTS = data;
-                csmacaEntry('d');
+                //txGTS = data;
+                //csmacaEntry('d');
                 break;
             }
 
@@ -616,8 +616,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                 strcpy
                 (taskP.taskFrFunc(task), "handle_PD_DATA_request");
                 ASSERT(txGTS == NULL);
-                txGTS = data;
-                csmacaEntry('d');
+                //txGTS = data;
+                //csmacaEntry('d');
                 break;
             }
 
@@ -633,8 +633,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                 strcpy
                 (taskP.taskFrFunc(task), "handle_PD_DATA_request");
                 ASSERT(txData == NULL);
-                txData = data;
-                csmacaEntry('d');
+                //txData = data;
+                //csmacaEntry('d');
                 break;
             }
 
@@ -650,8 +650,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                 strcpy
                 (taskP.taskFrFunc(task), "handle_PD_DATA_request");
                 ASSERT(txData == NULL);
-                txData = data;
-                csmacaEntry('d');
+                //txData = data;
+                //csmacaEntry('d');
                 break;
             }
 
@@ -661,6 +661,41 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
             }
         }  // switch
 
+        // SICUREZZA DATIIIIIIIIIIIIIIIIIIIII
+
+        if (mpib.getMacSecurityEnabled())
+        {
+            Ash assoAsh;
+            assoAsh.secu.Seculevel = mpib.getSeculevel();
+            data->setAsh(assoAsh);
+
+            if (assoAsh.secu.Seculevel == 1 || assoAsh.secu.Seculevel == 2 || assoAsh.secu.Seculevel == 3)
+            {
+                data->setMic(secPacket(data->dup()).c_str());
+
+            }
+            else if (assoAsh.secu.Seculevel == 5 || assoAsh.secu.Seculevel == 6 || assoAsh.secu.Seculevel == 7)
+            {
+
+                data->setPayload(secPacket(data->dup()).c_str());
+                data->getEncapsulatedPacket()->setName("");
+
+            }
+
+        }
+
+        //FINEEEEEEEEEEEEEE SICUREZZAAAAAAAAAAAAAAAAA
+
+        if (dataReq->getTxOptions() == 2 || dataReq->getTxOptions() == 3)
+        {
+            txGTS = data;
+        }
+        else
+        {
+            txData = data;
+        }
+
+        csmacaEntry('d');
         delete (msg); // fix for undisposed object message (incoming messages from MCPS_SAP)
         return;
     }  // if (msg->arrivedOn("MCPS_SAP"))
@@ -1858,6 +1893,41 @@ void IEEE802154Mac::handleData(mpdu* frame)
 // we need some time to process the packet -- so delay SIFS/LIFS symbols from now or after finishing sending the ACK
 // (refer to Figure 68 of the 802.15.4-2006 Spec. for details of SIFS/LIFS)
     ASSERT(rxData == NULL);
+
+    if (mpib.getMacSecurityEnabled())
+    {
+
+        /**
+         std::cout << " TESTO DECIFRATO IN HEX" << endl;
+         printHex(encoded);
+         std::cout << endl;
+
+
+         //std::string authenticated;
+         //std::string null;
+         //std::cout << " PARSER" << endl;
+         //setAPDATA(&authenticated,&null,bcnFrame, bcnFrame->getName(),false);
+         **/
+
+        if (frame->getAsh().secu.Seculevel == 1 || frame->getAsh().secu.Seculevel == 2 || frame->getAsh().secu.Seculevel == 3)
+        {
+
+            secRecPacket(frame);
+
+        }
+        else if (frame->getAsh().secu.Seculevel == 5 || frame->getAsh().secu.Seculevel == 6 || frame->getAsh().secu.Seculevel == 7)
+        {
+
+            std::string encoded = secRecPacket(frame);
+            frame->getEncapsulatedPacket()->setName(encoded.data());
+
+        }
+
+        //std::cout << "RXSFSPEC  " << endl;
+        //std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
+
+    }
+
     rxData = (frame->dup());
 
     if (!((frmCtrl & arequMask) >> arequShift))
@@ -7200,6 +7270,52 @@ void IEEE802154Mac::setAPDATA(std::string *adata, std::string *pdata, mpdu *fram
         }
 
     }
+    else if (strcmp(frame->getName(), "DATA.indication") == 0)
+    {
+
+        /*
+         * DATI PACCHETTO
+         *
+         *  frame control # sequence number # addressing field # ash # data payload
+         *
+         *  //nel pacchetto manca fcs che non va nè autenticato e ne cifrato
+         *
+         *  ash= security control * frame Count * key identifier
+         *  addressing field= srcPANID * MACADDRESS src * destPANID * MACADDRESS dest
+         *
+         * */
+
+        mpdu *tmpMpdu = check_and_cast<mpdu *>(frame);
+
+        *adata += tmpMpdu->getFcf();
+        *adata += '#';
+        //frame control
+        *adata += '#';
+        *adata += tmpMpdu->getSqnr();
+        *adata += '#';
+        *adata += tmpMpdu->getSrcPANid();
+        *adata += '*';
+        *adata += tmpMpdu->getSrc().str();
+        *adata += '*';
+        *adata += tmpMpdu->getDestPANid();
+        *adata += '*';
+        *adata += tmpMpdu->getDest().str();
+        *adata += '#';
+        *adata += tmpMpdu->getAsh().secu.Seculevel;
+        *adata += tmpMpdu->getAsh().secu.KeyIdMode;
+        *adata += '*';
+        *adata += tmpMpdu->getAsh().FrameCount;
+        *adata += '*';
+        *adata += tmpMpdu->getAsh().KeyIdentifier.KeySource;
+        *adata += tmpMpdu->getAsh().KeyIdentifier.KeyIndex;
+        *adata += '#';
+
+        if (encryption)
+        {
+
+            *pdata += tmpMpdu->getEncapsulatedPacket()->getName();
+        }
+    }
 
 }
 
@@ -7275,6 +7391,34 @@ void IEEE802154Mac::setADATA(std::string *adata, mpdu *frame)
         // pending field
         *adata += '#';
         *adata += tmpBcn->getPayload();
+    }
+    else if (strcmp(frame->getName(), "DATA.indication") == 0)
+    {
+        mpdu *tmpMpdu = check_and_cast<mpdu *>(frame);
+
+        *adata += tmpMpdu->getFcf();
+        *adata += '#';
+        //frame control
+        *adata += '#';
+        *adata += tmpMpdu->getSqnr();
+        *adata += '#';
+        *adata += tmpMpdu->getSrcPANid();
+        *adata += '*';
+        *adata += tmpMpdu->getSrc().str();
+        *adata += '*';
+        *adata += tmpMpdu->getDestPANid();
+        *adata += '*';
+        *adata += tmpMpdu->getDest().str();
+        *adata += '#';
+        *adata += tmpMpdu->getAsh().secu.Seculevel;
+        *adata += tmpMpdu->getAsh().secu.KeyIdMode;
+        *adata += '*';
+        *adata += tmpMpdu->getAsh().FrameCount;
+        *adata += '*';
+        *adata += tmpMpdu->getAsh().KeyIdentifier.KeySource;
+        *adata += tmpMpdu->getAsh().KeyIdentifier.KeyIndex;
+        *adata += '#';
+        *adata += tmpMpdu->getEncapsulatedPacket()->getName();
     }
     return;
 
@@ -7381,17 +7525,17 @@ std::string IEEE802154Mac::secRecPacket(mpdu *frame)
             break;
         case 5:
             setAPDATA(&radata, &null, frame, false);
-            decoder.Put((const byte *) frame->getPayload(),strlen(frame->getPayload()));
+            decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
             decipherT = AEADDecypher32(temp.str(), radata);
             break;
         case 6:
             setAPDATA(&radata, &null, frame, false);
-            decoder.Put((const byte *) frame->getPayload(),strlen(frame->getPayload()));
+            decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
             decipherT = AEADDecypher64(temp.str(), radata);
             break;
         case 7:
             setAPDATA(&radata, &null, frame, false);
-            decoder.Put((const byte *) frame->getPayload(),strlen(frame->getPayload()));
+            decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
             decipherT = AEADDecypher128(temp.str(), radata);
             break;
         default:
