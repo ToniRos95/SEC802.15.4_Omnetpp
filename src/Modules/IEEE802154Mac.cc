@@ -729,7 +729,6 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                 else if (dynamic_cast<AssociationRequest *>(msg))
                 {
 
-
                     AssociationRequest* frame = check_and_cast<AssociationRequest *>(msg);
                     AssoCmdreq* AssoCommand = new AssoCmdreq("ASSOCIATE-request-command");
                     MACAddressExt dest;
@@ -776,10 +775,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                     AssoCommand->setDestPANid(mpib.getMacPANId());
                     AssoCommand->setSrc(myMacAddr);
 
-
                     if (mpib.getMacSecurityEnabled())
                     {
-                        std::cout << "WEE fwegwgwrgwgwgwe";
 
                         Ash assoAsh;
                         assoAsh.FrameCount = 1;
@@ -789,8 +786,6 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                         //assoAsh.secu.Seculevel = frame->getSecurityLevel();
 
                         assoAsh.secu.Seculevel = mpib.getSeculevel();
-
-
 
                         AssoCommand->setAsh(assoAsh);
 
@@ -2027,7 +2022,7 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                         DevCap[3][0] == '\x00' ? false : true, //rowi
                         DevCap[6][0] == '\x00' ? false : true, // seccapable
                         DevCap[7][0] == '\x00' ? false : true, // allowshort
-                        &DevCap[10][0] //hostname
+                        "" //hostname
                         };
 
                         assoInd->setCapabilityInformation(tempDevCap);
@@ -2082,6 +2077,46 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
             {
                 AssociationConfirm* assoConf = new AssociationConfirm("MLME-ASSOCIATE.confirm");
                 AssoCmdresp* aresp = check_and_cast<AssoCmdresp *>(cmdFrame);
+
+                if (mpib.getMacSecurityEnabled())
+                {
+
+                    /**
+                     std::cout << " TESTO DECIFRATO IN HEX" << endl;
+                     printHex(encoded);
+                     std::cout << endl;
+
+
+                     //std::string authenticated;
+                     //std::string null;
+                     //std::cout << " PARSER" << endl;
+                     //setAPDATA(&authenticated,&null,bcnFrame, bcnFrame->getName(),false);
+                     **/
+
+                    if (aresp->getAsh().secu.Seculevel == 1 || aresp->getAsh().secu.Seculevel == 2 || aresp->getAsh().secu.Seculevel == 3)
+                    {
+
+                        secRecPacket(aresp);
+
+                    }
+                    else if (aresp->getAsh().secu.Seculevel == 5 || aresp->getAsh().secu.Seculevel == 6 || aresp->getAsh().secu.Seculevel == 7)
+                    {
+
+                        std::string encoded = secRecPacket(aresp);
+                        std::vector<string> temp = parserSecMessage(encoded, '\x23');
+
+                        unsigned short shortAddress;
+                        unsigned short status;
+                        std::istringstream(temp[0]) >> std::hex >> shortAddress;
+                        std::istringstream(temp[1]) >> std::hex >> status;
+
+                        aresp->setShortAddress(shortAddress);
+                        aresp->setStatus(status);
+
+                    }
+
+                }
+
                 assoConf->setStatus(aresp->getStatus());
 
                 if (mpib.getMacSecurityEnabled())
@@ -2895,6 +2930,32 @@ void IEEE802154Mac::genAssoResp(MlmeAssociationStatus status, AssoCmdreq* tmpAss
     assoResp->setSrcPANid(mpib.getMacPANId());
     unsigned char sqnr = mpib.getMacDSN();
     assoResp->setSqnr(sqnr);
+
+    if (mpib.getMacSecurityEnabled())
+    {
+
+        Ash assoAsh;
+
+        assoAsh.secu.Seculevel = mpib.getSeculevel();
+
+        assoResp->setAsh(assoAsh);
+
+        if (assoAsh.secu.Seculevel == 1 || assoAsh.secu.Seculevel == 2 || assoAsh.secu.Seculevel == 3)
+        {
+            assoResp->setMic(secPacket(assoResp->dup()).c_str());
+
+        }
+        else if (assoAsh.secu.Seculevel == 5 || assoAsh.secu.Seculevel == 6 || assoAsh.secu.Seculevel == 7)
+        {
+
+            assoResp->setPayload(secPacket(assoResp->dup()).c_str());
+            assoResp->setStatus(65535); // valore non corretto per non mandare in chiaro i dati
+            assoResp->setShortAddress(65535); // 16bit short address, value of 0xffff (65.535) indicates that the device does not have a short address
+
+        }
+
+    }
+
     (sqnr < 255) ? sqnr++ : sqnr = 0; // check if 8-bit data sequence number needs to roll over
     mpib.setMacDSN(sqnr);
 
@@ -7473,8 +7534,50 @@ void IEEE802154Mac::setAPDATA(std::string *adata, std::string *pdata, mpdu *fram
             *pdata += tmp.alloShortAddr;
             *pdata += '*';
             *pdata += tmp.alterPANCoor;
-            *pdata += '*';
-            *pdata += tmp.hostName;
+        }
+
+    }
+    else if (strcmp(frame->getName(), "MLME-ASSOCIATE.response") == 0)
+    {
+        AssoCmdresp* Assoresp = check_and_cast<AssoCmdresp *>(frame);
+
+        *adata += Assoresp->getFcf();
+        *adata += '#';
+        //frame control
+        *adata += '#';
+        *adata += Assoresp->getSqnr();
+        *adata += '#';
+        *adata += Assoresp->getSrcPANid();
+        *adata += '*';
+        *adata += Assoresp->getSrc().str();
+        *adata += '*';
+        *adata += Assoresp->getDestPANid();
+        *adata += '*';
+        *adata += Assoresp->getDest().str();
+        *adata += '#';
+        *adata += Assoresp->getAsh().secu.Seculevel;
+        *adata += Assoresp->getAsh().secu.KeyIdMode;
+        *adata += '*';
+        *adata += Assoresp->getAsh().FrameCount;
+        *adata += '*';
+        *adata += Assoresp->getAsh().KeyIdentifier.KeySource;
+        *adata += Assoresp->getAsh().KeyIdentifier.KeyIndex;
+        *adata += '#';
+        *adata += Assoresp->getCmdType();
+        *adata += '#';
+
+        if (encryption)
+        {
+
+            std::stringstream stream;
+
+            stream << std::hex << Assoresp->getShortAddress();
+            *pdata += stream.str();
+            stream.str("");
+            *pdata += '#';
+            stream << std::hex << Assoresp->getStatus();
+            stream.str("");
+
         }
 
     }
@@ -7581,6 +7684,66 @@ void IEEE802154Mac::setADATA(std::string *adata, mpdu *frame)
         *adata += tmpMpdu->getAsh().KeyIdentifier.KeyIndex;
         *adata += '#';
         *adata += tmpMpdu->getEncapsulatedPacket()->getName();
+    }
+    else if (strcmp(frame->getName(), "ASSOCIATE-request-command") == 0)
+    {
+
+        /*
+         *  PACCHETTO COMANDO RICHIESTA ASSOCIAZIONE
+         *
+         *  frame control # sequence number # addressing field # ash # Command id # content
+         *
+         *  //nel pacchetto manca fcs che non va nè autenticato e ne cifrato
+         *
+         *  ash= security control * frame Count * key identifier
+         *  addressing field= srcPANID * MACADDRESS src * destPANID * MACADDRESS dest
+         *  content= * * device type * power source * rowi * * * security capability * allocate address * address * allpancoor * hostname
+         *
+         * */
+
+        AssoCmdreq* AssoCmd = check_and_cast<AssoCmdreq *>(frame);
+        DevCapability tmp = AssoCmd->getCapabilityInformation();
+
+        *adata += AssoCmd->getFcf();
+        *adata += '#';
+        //frame control
+        *adata += '#';
+        *adata += AssoCmd->getSqnr();
+        *adata += '#';
+        *adata += AssoCmd->getSrcPANid();
+        *adata += '*';
+        *adata += AssoCmd->getSrc().str();
+        *adata += '*';
+        *adata += AssoCmd->getDestPANid();
+        *adata += '*';
+        *adata += AssoCmd->getDest().str();
+        *adata += '#';
+        *adata += AssoCmd->getAsh().secu.Seculevel;
+        *adata += AssoCmd->getAsh().secu.KeyIdMode;
+        *adata += '*';
+        *adata += AssoCmd->getAsh().FrameCount;
+        *adata += '*';
+        *adata += AssoCmd->getAsh().KeyIdentifier.KeySource;
+        *adata += AssoCmd->getAsh().KeyIdentifier.KeyIndex;
+        *adata += '#';
+        *adata += AssoCmd->getCmdType();
+        *adata += '#';
+        *adata += '*';
+        *adata += '*';
+        *adata += tmp.FFD;
+        *adata += '*';
+        *adata += tmp.powSrc;
+        *adata += '*';
+        *adata += tmp.recvOnWhenIdle;
+        *adata += '*';
+        *adata += '*';
+        *adata += '*';
+        *adata += tmp.secuCapable;
+        *adata += '*';
+        *adata += tmp.alloShortAddr;
+        *adata += '*';
+        *adata += tmp.alterPANCoor;
+
     }
     return;
 
