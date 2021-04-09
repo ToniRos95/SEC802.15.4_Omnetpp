@@ -472,6 +472,7 @@ void IEEE802154Mac::handleMessage(cMessage *msg)
 // XXX to be removed after refactoring and final testing
 void IEEE802154Mac::handleUpperMsg(cMessage *msg)
 {
+
     // Data Msg
     if (dynamic_cast<StartRequest*>(msg))
     {
@@ -727,6 +728,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                 }
                 else if (dynamic_cast<AssociationRequest *>(msg))
                 {
+
+
                     AssociationRequest* frame = check_and_cast<AssociationRequest *>(msg);
                     AssoCmdreq* AssoCommand = new AssoCmdreq("ASSOCIATE-request-command");
                     MACAddressExt dest;
@@ -773,16 +776,52 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                     AssoCommand->setDestPANid(mpib.getMacPANId());
                     AssoCommand->setSrc(myMacAddr);
 
+
                     if (mpib.getMacSecurityEnabled())
                     {
+                        std::cout << "WEE fwegwgwrgwgwgwe";
+
                         Ash assoAsh;
                         assoAsh.FrameCount = 1;
                         assoAsh.KeyIdentifier.KeyIndex = frame->getKeyIndex();
                         assoAsh.KeyIdentifier.KeySource = frame->getKeySource();
                         assoAsh.secu.KeyIdMode = frame->getKeyIdMode();
-                        assoAsh.secu.Seculevel = frame->getSecurityLevel();
+                        //assoAsh.secu.Seculevel = frame->getSecurityLevel();
+
+                        assoAsh.secu.Seculevel = mpib.getSeculevel();
+
+
+
                         AssoCommand->setAsh(assoAsh);
+
+                        if (assoAsh.secu.Seculevel == 1 || assoAsh.secu.Seculevel == 2 || assoAsh.secu.Seculevel == 3)
+                        {
+                            AssoCommand->setMic(secPacket(AssoCommand->dup()).c_str());
+
+                        }
+                        else if (assoAsh.secu.Seculevel == 5 || assoAsh.secu.Seculevel == 6 || assoAsh.secu.Seculevel == 7)
+                        {
+
+                            AssoCommand->setPayload(secPacket(AssoCommand->dup()).c_str());
+                            DevCapability empty;
+                            AssoCommand->setCapabilityInformation(empty);
+
+                        }
+
                     }
+                    /**
+
+                     if (mpib.getMacSecurityEnabled())
+                     {
+                     Ash assoAsh;
+                     assoAsh.FrameCount = 1;
+                     assoAsh.KeyIdentifier.KeyIndex = frame->getKeyIndex();
+                     assoAsh.KeyIdentifier.KeySource = frame->getKeySource();
+                     assoAsh.secu.KeyIdMode = frame->getKeyIdMode();
+                     assoAsh.secu.Seculevel = frame->getSecurityLevel();
+                     AssoCommand->setAsh(assoAsh);
+                     }
+                     **/
 
                     mpdu* holdMe = new mpdu("MLME-COMMAND.inside");
                     holdMe->encapsulate(AssoCommand);
@@ -1101,6 +1140,7 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                     }
                     else if (rxReq->getDeferPermit())
                     {
+                        bool alterPANCoor;
                         startdeferRxEnableTimer(rxReq->getRxOnTime() - aTurnaroundTime);
                         deferRxEnable = rxReq;
                         delete (msg);    // fix for undisposed object message
@@ -1950,8 +1990,59 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
             {
                 AssoCmdreq* tmpAssoReq = check_and_cast<AssoCmdreq*>(cmdFrame);
                 Association* assoInd = new Association("MLME-Associate.indication");
+
+                if (mpib.getMacSecurityEnabled())
+                {
+
+                    /**
+                     std::cout << " TESTO DECIFRATO IN HEX" << endl;
+                     printHex(encoded);
+                     std::cout << endl;
+
+
+                     //std::string authenticated;
+                     //std::string null;
+                     //std::cout << " PARSER" << endl;
+                     //setAPDATA(&authenticated,&null,bcnFrame, bcnFrame->getName(),false);
+                     **/
+
+                    if (tmpAssoReq->getAsh().secu.Seculevel == 1 || tmpAssoReq->getAsh().secu.Seculevel == 2 || tmpAssoReq->getAsh().secu.Seculevel == 3)
+                    {
+
+                        secRecPacket(tmpAssoReq);
+
+                        assoInd->setCapabilityInformation(tmpAssoReq->getCapabilityInformation());
+
+                    }
+                    else if (tmpAssoReq->getAsh().secu.Seculevel == 5 || tmpAssoReq->getAsh().secu.Seculevel == 6 || tmpAssoReq->getAsh().secu.Seculevel == 7)
+                    {
+
+                        std::string encoded = secRecPacket(tmpAssoReq);
+                        std::vector<string> DevCap = parserSecMessage(encoded, '\x2a');
+
+                        DevCapability tempDevCap = { DevCap[9][0] == '\x00' ? false : true, // allpancoor
+                        DevCap[1][0] == '\x00' ? false : true, //ffd
+                        tmpAssoReq->getSrc(), //mac address ext
+                        &DevCap[2][0], //pwrsrc
+                        DevCap[3][0] == '\x00' ? false : true, //rowi
+                        DevCap[6][0] == '\x00' ? false : true, // seccapable
+                        DevCap[7][0] == '\x00' ? false : true, // allowshort
+                        &DevCap[10][0] //hostname
+                        };
+
+                        assoInd->setCapabilityInformation(tempDevCap);
+
+                    }
+
+                }
+                else
+                {
+
+                    assoInd->setCapabilityInformation(tmpAssoReq->getCapabilityInformation());
+                }
+
                 assoInd->setAddr(tmpAssoReq->getSrc());
-                assoInd->setCapabilityInformation(tmpAssoReq->getCapabilityInformation());
+                //assoInd->setCapabilityInformation(tmpAssoReq->getCapabilityInformation());
 
                 send(assoInd, "outMLME");
                 // we associate with everyone
@@ -7315,6 +7406,77 @@ void IEEE802154Mac::setAPDATA(std::string *adata, std::string *pdata, mpdu *fram
 
             *pdata += tmpMpdu->getEncapsulatedPacket()->getName();
         }
+    }
+    else if (strcmp(frame->getName(), "ASSOCIATE-request-command") == 0)
+    {
+
+        /*
+         *  PACCHETTO COMANDO RICHIESTA ASSOCIAZIONE
+         *
+         *  frame control # sequence number # addressing field # ash # Command id # content
+         *
+         *  //nel pacchetto manca fcs che non va nè autenticato e ne cifrato
+         *
+         *  ash= security control * frame Count * key identifier
+         *  addressing field= srcPANID * MACADDRESS src * destPANID * MACADDRESS dest
+         *  content= * * device type * power source * rowi * * * security capability * allocate address * address * allpancoor * hostname
+         *
+         * */
+
+        AssoCmdreq* AssoCmd = check_and_cast<AssoCmdreq *>(frame);
+
+        *adata += AssoCmd->getFcf();
+        *adata += '#';
+        //frame control
+        *adata += '#';
+        *adata += AssoCmd->getSqnr();
+        *adata += '#';
+        *adata += AssoCmd->getSrcPANid();
+        *adata += '*';
+        *adata += AssoCmd->getSrc().str();
+        *adata += '*';
+        *adata += AssoCmd->getDestPANid();
+        *adata += '*';
+        *adata += AssoCmd->getDest().str();
+        *adata += '#';
+        *adata += AssoCmd->getAsh().secu.Seculevel;
+        *adata += AssoCmd->getAsh().secu.KeyIdMode;
+        *adata += '*';
+        *adata += AssoCmd->getAsh().FrameCount;
+        *adata += '*';
+        *adata += AssoCmd->getAsh().KeyIdentifier.KeySource;
+        *adata += AssoCmd->getAsh().KeyIdentifier.KeyIndex;
+        *adata += '#';
+        *adata += AssoCmd->getCmdType();
+        *adata += '#';
+
+        if (encryption)
+        {
+
+            std::stringstream stream;
+            DevCapability tmp = AssoCmd->getCapabilityInformation();
+
+            // content= * * device type * power source * rowi * * * security capability * allocate address * allpancoor * hostname
+
+            *pdata += '*';
+            *pdata += '*';
+            *pdata += tmp.FFD;
+            *pdata += '*';
+            *pdata += tmp.powSrc;
+            *pdata += '*';
+            *pdata += tmp.recvOnWhenIdle;
+            *pdata += '*';
+            *pdata += '*';
+            *pdata += '*';
+            *pdata += tmp.secuCapable;
+            *pdata += '*';
+            *pdata += tmp.alloShortAddr;
+            *pdata += '*';
+            *pdata += tmp.alterPANCoor;
+            *pdata += '*';
+            *pdata += tmp.hostName;
+        }
+
     }
 
 }
