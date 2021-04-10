@@ -2081,7 +2081,6 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
 
                 if (mpib.getMacSecurityEnabled())
                 {
-                    std::cout << "PEPPINOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO";
 
                     if (aresp->getAsh().secu.Seculevel == 1 || aresp->getAsh().secu.Seculevel == 2 || aresp->getAsh().secu.Seculevel == 3)
                     {
@@ -2091,13 +2090,9 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                     }
                     else if (aresp->getAsh().secu.Seculevel == 5 || aresp->getAsh().secu.Seculevel == 6 || aresp->getAsh().secu.Seculevel == 7)
                     {
-                        std::cout << "MARIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
                         std::string encoded = secRecPacket(aresp);
                         std::vector<string> temp = parserSecMessage(encoded, '\x23');
-
-
-                        std::cout << temp[0] << "\n";
-                        std::cout << temp[1]<< "\n";
 
                         unsigned short shortAddress;
                         unsigned short status;
@@ -7573,11 +7568,8 @@ void IEEE802154Mac::setAPDATA(std::string *adata, std::string *pdata, mpdu *fram
             stream.str("");
             *pdata += '#';
             stream << std::hex << Assoresp->getStatus();
+            *pdata += stream.str();
             stream.str("");
-
-            std::cout << "PRIMA DELLA CIFRATURA \n";
-            std::cout << Assoresp->getShortAddress() << "\n";
-            std::cout <<  Assoresp->getStatus() << "\n";
 
         }
 
@@ -7705,6 +7697,7 @@ void IEEE802154Mac::setADATA(std::string *adata, mpdu *frame)
         AssoCmdreq* AssoCmd = check_and_cast<AssoCmdreq *>(frame);
         DevCapability tmp = AssoCmd->getCapabilityInformation();
 
+
         *adata += AssoCmd->getFcf();
         *adata += '#';
         //frame control
@@ -7746,296 +7739,334 @@ void IEEE802154Mac::setADATA(std::string *adata, mpdu *frame)
         *adata += tmp.alterPANCoor;
 
     }
-    return;
+    else if (strcmp(frame->getName(), "MLME-ASSOCIATE.response") == 0)
+    {
+        AssoCmdresp* Assoresp = check_and_cast<AssoCmdresp *>(frame);
+        std::stringstream stream;
+
+        *adata += Assoresp->getFcf();
+        *adata += '#';
+        //frame control
+        *adata += '#';
+        *adata += Assoresp->getSqnr();
+        *adata += '#';
+        *adata += Assoresp->getSrcPANid();
+        *adata += '*';
+        *adata += Assoresp->getSrc().str();
+        *adata += '*';
+        *adata += Assoresp->getDestPANid();
+        *adata += '*';
+        *adata += Assoresp->getDest().str();
+        *adata += '#';
+        *adata += Assoresp->getAsh().secu.Seculevel;
+        *adata += Assoresp->getAsh().secu.KeyIdMode;
+        *adata += '*';
+        *adata += Assoresp->getAsh().FrameCount;
+        *adata += '*';
+        *adata += Assoresp->getAsh().KeyIdentifier.KeySource;
+        *adata += Assoresp->getAsh().KeyIdentifier.KeyIndex;
+        *adata += '#';
+        *adata += Assoresp->getCmdType();
+        *adata += '#';
+        stream << std::hex << Assoresp->getShortAddress();
+        *adata += stream.str();
+        stream.str("");
+        *adata += '#';
+        stream << std::hex << Assoresp->getStatus();
+        *adata += stream.str();
+        stream.str("");
+
+    }
+return;
 
 }
 
 std::string IEEE802154Mac::secPacket(mpdu *frame)
 {
 
-    /**adata è la parte di messaggio che viene mandata in chiaro e deve essere autenticata
-     * pdata è la parte di messaggio che deve essere cifrata
-     *
-     */
-    std::string adata, pdata;
-    std::string result;
+/**adata è la parte di messaggio che viene mandata in chiaro e deve essere autenticata
+ * pdata è la parte di messaggio che deve essere cifrata
+ *
+ */
+std::string adata, pdata;
+std::string result;
 
-    switch (frame->getAsh().secu.Seculevel)
-    {
-        case 1:
-            setADATA(&adata, frame);
-            //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
-            result = CBCMACAuth32(adata);
-            break;
-        case 2:
-            setADATA(&adata, frame);
-            //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
-            result = CBCMACAuth64(adata);
-            break;
-        case 3:
-            setADATA(&adata, frame);
-            //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
-            result = CBCMACAuth128(adata);
-            break;
-        case 5:
-            setAPDATA(&adata, &pdata, frame, true);
-            result = AEADCypher32(adata, pdata);
-            break;
-        case 6:
-            setAPDATA(&adata, &pdata, frame, true);
-            result = AEADCypher64(adata, pdata);
-            break;
-        case 7:
-            setAPDATA(&adata, &pdata, frame, true);
-            result = AEADCypher128(adata, pdata);
-            break;
-        default:
-            std::cout << "secuLevel : " << frame->getAsh().secu.Seculevel << endl;
-            throw cRuntimeError("secuLevel error");
-    }
+switch (frame->getAsh().secu.Seculevel)
+{
+    case 1:
+        setADATA(&adata, frame);
+        //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
+        result = CBCMACAuth32(adata);
+        break;
+    case 2:
+        setADATA(&adata, frame);
+        //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
+        result = CBCMACAuth64(adata);
+        break;
+    case 3:
+        setADATA(&adata, frame);
+        //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
+        result = CBCMACAuth128(adata);
+        break;
+    case 5:
+        setAPDATA(&adata, &pdata, frame, true);
+        result = AEADCypher32(adata, pdata);
+        break;
+    case 6:
+        setAPDATA(&adata, &pdata, frame, true);
+        result = AEADCypher64(adata, pdata);
+        break;
+    case 7:
+        setAPDATA(&adata, &pdata, frame, true);
+        result = AEADCypher128(adata, pdata);
+        break;
+    default:
+        std::cout << "secuLevel : " << frame->getAsh().secu.Seculevel << endl;
+        throw cRuntimeError("secuLevel error");
+}
 
-    /*
-     std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
-     std::cout << adata;
-     std::cout << std::endl << std::endl;
-     std::cout << " TESTO ADATA IN HEX" << endl;
-     printHex(adata);
-     std::cout << endl << endl;
-     std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
-     << std::endl;
-     std::cout << pdata;
-     std::cout << std::endl << std::endl;
-     std::cout << " TESTO IN CHIARO IN HEX" << endl;
-     printHex(pdata);
-     std::cout << endl << endl;
-     std::cout << " TESTO CIFRATO IN HEX" << endl;
-     printHex(cipherT);
-     std::cout << endl << endl;
-     */
+/*
+ std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
+ std::cout << adata;
+ std::cout << std::endl << std::endl;
+ std::cout << " TESTO ADATA IN HEX" << endl;
+ printHex(adata);
+ std::cout << endl << endl;
+ std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
+ << std::endl;
+ std::cout << pdata;
+ std::cout << std::endl << std::endl;
+ std::cout << " TESTO IN CHIARO IN HEX" << endl;
+ printHex(pdata);
+ std::cout << endl << endl;
+ std::cout << " TESTO CIFRATO IN HEX" << endl;
+ printHex(cipherT);
+ std::cout << endl << endl;
+ */
 
-    return result;
+return result;
 
 }
 
 std::string IEEE802154Mac::secRecPacket(mpdu *frame)
 {
 
-    std::string radata;
-    std::string null;
-    //std::string cipher = frame->getPayload();
-    std::string decipherT;
-    std::stringstream temp;
+std::string radata;
+std::string null;
+//std::string cipher = frame->getPayload();
+std::string decipherT;
+std::stringstream temp;
 
-    HexDecoder decoder(new FileSink(temp));
+HexDecoder decoder(new FileSink(temp));
 
-    switch (frame->getAsh().secu.Seculevel)
-    {
-        case 1:
-            setADATA(&radata, frame);
-            decoder.Put((const byte *) frame->getMic(), 8);
-            //std::cout << temp.str();
-            CBCMACVerify32(radata, temp.str());
+switch (frame->getAsh().secu.Seculevel)
+{
+    case 1:
+        setADATA(&radata, frame);
+        decoder.Put((const byte *) frame->getMic(), 8);
+        //std::cout << temp.str();
+        CBCMACVerify32(radata, temp.str());
 
-            break;
-        case 2:
-            setADATA(&radata, frame);
-            decoder.Put((const byte *) frame->getMic(), 16);
-            //std::cout << temp.str();
-            CBCMACVerify64(radata, temp.str());
-            break;
-        case 3:
-            setADATA(&radata, frame);
-            decoder.Put((const byte *) frame->getMic(), 32);
-            //std::cout << temp.str();
-            CBCMACVerify128(radata, temp.str());
-            break;
-        case 5:
-            setAPDATA(&radata, &null, frame, false);
-            decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
-            decipherT = AEADDecypher32(temp.str(), radata);
-            break;
-        case 6:
-            setAPDATA(&radata, &null, frame, false);
-            decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
-            decipherT = AEADDecypher64(temp.str(), radata);
-            break;
-        case 7:
-            setAPDATA(&radata, &null, frame, false);
-            decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
-            decipherT = AEADDecypher128(temp.str(), radata);
-            break;
-        default:
-            std::cout << "secuLevel : " << frame->getAsh().secu.Seculevel << endl;
-            throw cRuntimeError("secuLevel error");
-    }
+        break;
+    case 2:
+        setADATA(&radata, frame);
+        decoder.Put((const byte *) frame->getMic(), 16);
+        //std::cout << temp.str();
+        CBCMACVerify64(radata, temp.str());
+        break;
+    case 3:
+        setADATA(&radata, frame);
+        decoder.Put((const byte *) frame->getMic(), 32);
+        //std::cout << temp.str();
+        CBCMACVerify128(radata, temp.str());
+        break;
+    case 5:
+        setAPDATA(&radata, &null, frame, false);
+        decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
+        decipherT = AEADDecypher32(temp.str(), radata);
+        break;
+    case 6:
+        setAPDATA(&radata, &null, frame, false);
+        decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
+        decipherT = AEADDecypher64(temp.str(), radata);
+        break;
+    case 7:
+        setAPDATA(&radata, &null, frame, false);
+        decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
+        decipherT = AEADDecypher128(temp.str(), radata);
+        break;
+    default:
+        std::cout << "secuLevel : " << frame->getAsh().secu.Seculevel << endl;
+        throw cRuntimeError("secuLevel error");
+}
 
-    /*
-     std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
-     std::cout << adata;
-     std::cout << std::endl << std::endl;
-     std::cout << " TESTO ADATA IN HEX" << endl;
-     printHex(adata);
-     std::cout << endl << endl;
-     std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
-     << std::endl;
-     std::cout << pdata;
-     std::cout << std::endl << std::endl;
-     std::cout << " TESTO IN CHIARO IN HEX" << endl;
-     printHex(pdata);
-     std::cout << endl << endl;
-     std::cout << " TESTO CIFRATO IN HEX" << endl;
-     printHex(cipherT);
-     std::cout << endl << endl;
-     */
+/*
+ std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
+ std::cout << adata;
+ std::cout << std::endl << std::endl;
+ std::cout << " TESTO ADATA IN HEX" << endl;
+ printHex(adata);
+ std::cout << endl << endl;
+ std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
+ << std::endl;
+ std::cout << pdata;
+ std::cout << std::endl << std::endl;
+ std::cout << " TESTO IN CHIARO IN HEX" << endl;
+ printHex(pdata);
+ std::cout << endl << endl;
+ std::cout << " TESTO CIFRATO IN HEX" << endl;
+ printHex(cipherT);
+ std::cout << endl << endl;
+ */
 
-    return decipherT;
+return decipherT;
 
 }
 
 void IEEE802154Mac::printHex(std::string text)
 {
 
-    for (int i = 0; i < text.size(); i++)
-    {
+for (int i = 0; i < text.size(); i++)
+{
 
-        std::cout << std::hex << (0xFF & static_cast<byte>(text[i])) << " ";
+    std::cout << std::hex << (0xFF & static_cast<byte>(text[i])) << " ";
 
-    }
-    std::cout << endl;
+}
+std::cout << endl;
 }
 
 vector<string> IEEE802154Mac::parserSecMessage(std::string str, char ch)
 {
 
-    string next;
-    vector<string> result;
+string next;
+vector<string> result;
 
 // For each character in the string
-    for (string::const_iterator it = str.begin(); it != str.end(); it++)
+for (string::const_iterator it = str.begin(); it != str.end(); it++)
+{
+    // If we've hit the terminal character
+    if (*it == ch)
     {
-        // If we've hit the terminal character
-        if (*it == ch)
-        {
-            // If we have some characters accumulated
-            //if (!next.empty()) {
-            // Add them to the result vector
-            result.push_back(next);
-            next.clear();
-            //}
-        }
-        else
-        {
-            // Accumulate the next character into the sequence
-            next += *it;
-        }
-    }
-    if (!next.empty())
+        // If we have some characters accumulated
+        //if (!next.empty()) {
+        // Add them to the result vector
         result.push_back(next);
+        next.clear();
+        //}
+    }
+    else
+    {
+        // Accumulate the next character into the sequence
+        next += *it;
+    }
+}
+if (!next.empty())
+    result.push_back(next);
 
-    return result;
-    /*
-     *
-     * METODO PER STAMPARE IL RISULTATO DEL PARSER
-     *
-     for (size_t i = 0; i < result.size(); i++) {
-     cout << "\"" << result[i] << "\"" << endl;
-     }
-     */
+return result;
+/*
+ *
+ * METODO PER STAMPARE IL RISULTATO DEL PARSER
+ *
+ for (size_t i = 0; i < result.size(); i++) {
+ cout << "\"" << result[i] << "\"" << endl;
+ }
+ */
 }
 
 /***************************** DA QUI IN POI È ROBA LORO *******************************/
 
 void IEEE802154Mac::finish()
 {
-    double currentTime = simTime().dbl();
-    if (currentTime == 0)
-    {
-        return;
-    }
-
-    recordScalar("Total simulation time", currentTime);
-    recordScalar("Total num of upper pkts received", numUpperPkt);
-    recordScalar("Num of upper pkts dropped", numUpperPktLost);
-    recordScalar("Num of BEACON pkts sent", numTxBcnPkt);
-    recordScalar("Num of DATA pkts sent successfully", numTxDataSucc);
-    recordScalar("Num of DATA pkts failed", numTxDataFail);
-    recordScalar("Num of DATA pkts sent successfully in GTS", numTxGTSSucc);
-    recordScalar("Num of DATA pkts failed in GTS", numTxGTSFail);
-    recordScalar("Num of ACK pkts sent", numTxAckPkt);
-    recordScalar("Num of BEACON pkts received", numRxBcnPkt);
-    recordScalar("Num of BEACON pkts lost", numLostBcn);
-    recordScalar("Num of DATA pkts received", numRxDataPkt);
-    recordScalar("Num of DATA pkts received in GTS", numRxGTSPkt);
-    recordScalar("Num of ACK pkts received", numRxAckPkt);
-    recordScalar("Num of collisions", numCollisions);
-    recordScalar("Num of bit errors", numBitErrors);
-
+double currentTime = simTime().dbl();
+if (currentTime == 0)
+{
     return;
+}
+
+recordScalar("Total simulation time", currentTime);
+recordScalar("Total num of upper pkts received", numUpperPkt);
+recordScalar("Num of upper pkts dropped", numUpperPktLost);
+recordScalar("Num of BEACON pkts sent", numTxBcnPkt);
+recordScalar("Num of DATA pkts sent successfully", numTxDataSucc);
+recordScalar("Num of DATA pkts failed", numTxDataFail);
+recordScalar("Num of DATA pkts sent successfully in GTS", numTxGTSSucc);
+recordScalar("Num of DATA pkts failed in GTS", numTxGTSFail);
+recordScalar("Num of ACK pkts sent", numTxAckPkt);
+recordScalar("Num of BEACON pkts received", numRxBcnPkt);
+recordScalar("Num of BEACON pkts lost", numLostBcn);
+recordScalar("Num of DATA pkts received", numRxDataPkt);
+recordScalar("Num of DATA pkts received in GTS", numRxGTSPkt);
+recordScalar("Num of ACK pkts received", numRxAckPkt);
+recordScalar("Num of collisions", numCollisions);
+recordScalar("Num of bit errors", numBitErrors);
+
+return;
 }
 
 IEEE802154Mac::IEEE802154Mac()
 {
-    txPkt = NULL;
-    txBeacon = NULL;
-    txBcnCmdUpper = NULL;
-    txBcnCmd = NULL;
-    txData = NULL;
-    txGTS = NULL;
-    txAck = NULL;
-    txCsmaca = NULL;
-    tmpCsmaca = NULL;
-    rxBeacon = NULL;
-    txGTSReq = NULL;
-    rxData = NULL;
-    rxCmd = NULL;
+txPkt = NULL;
+txBeacon = NULL;
+txBcnCmdUpper = NULL;
+txBcnCmd = NULL;
+txData = NULL;
+txGTS = NULL;
+txAck = NULL;
+txCsmaca = NULL;
+tmpCsmaca = NULL;
+rxBeacon = NULL;
+txGTSReq = NULL;
+rxData = NULL;
+rxCmd = NULL;
 
-    for (unsigned char i = 0; i <= 26; i++)
-    {
-        scanPANDescriptorList[i].CoordAddrMode = 0;
-        scanPANDescriptorList[i].CoordPANId = 0;
-        scanPANDescriptorList[i].CoordAddress = MACAddressExt::UNSPECIFIED_ADDRESS;
-        scanPANDescriptorList[i].LogicalChannel = 0;
-        scanPANDescriptorList[i].GTSPermit = false;
-        scanPANDescriptorList[i].LinkQuality = 0;
-        scanPANDescriptorList[i].SecurityUse = false;
-        scanPANDescriptorList[i].ACLEntry = 0;
-        scanPANDescriptorList[i].SecurityFailure = false;
-    }
+for (unsigned char i = 0; i <= 26; i++)
+{
+    scanPANDescriptorList[i].CoordAddrMode = 0;
+    scanPANDescriptorList[i].CoordPANId = 0;
+    scanPANDescriptorList[i].CoordAddress = MACAddressExt::UNSPECIFIED_ADDRESS;
+    scanPANDescriptorList[i].LogicalChannel = 0;
+    scanPANDescriptorList[i].GTSPermit = false;
+    scanPANDescriptorList[i].LinkQuality = 0;
+    scanPANDescriptorList[i].SecurityUse = false;
+    scanPANDescriptorList[i].ACLEntry = 0;
+    scanPANDescriptorList[i].SecurityFailure = false;
+}
 
 // timers
-    backoffTimer = NULL;
-    deferCCATimer = NULL;
-    bcnRxTimer = NULL;
-    bcnTxTimer = NULL;
-    ackTimeoutTimer = NULL;
-    txAckBoundTimer = NULL;
-    txCmdDataBoundTimer = NULL;
-    ifsTimer = NULL;
-    txSDTimer = NULL;
-    rxSDTimer = NULL;
-    finalCAPTimer = NULL;
-    gtsTimer = NULL;
-    scanTimer = NULL;
+backoffTimer = NULL;
+deferCCATimer = NULL;
+bcnRxTimer = NULL;
+bcnTxTimer = NULL;
+ackTimeoutTimer = NULL;
+txAckBoundTimer = NULL;
+txCmdDataBoundTimer = NULL;
+ifsTimer = NULL;
+txSDTimer = NULL;
+rxSDTimer = NULL;
+finalCAPTimer = NULL;
+gtsTimer = NULL;
+scanTimer = NULL;
 }
 
 IEEE802154Mac::~IEEE802154Mac()
 {
 // delete all possibly running Timers
-    cancelAndDelete(backoffTimer);
-    cancelAndDelete(deferCCATimer);
-    cancelAndDelete(bcnRxTimer);
-    cancelAndDelete(bcnTxTimer);
-    cancelAndDelete(ackTimeoutTimer);
-    cancelAndDelete(txAckBoundTimer);
-    cancelAndDelete(txCmdDataBoundTimer);
-    cancelAndDelete(ifsTimer);
-    cancelAndDelete(txSDTimer);
-    cancelAndDelete(rxSDTimer);
-    cancelAndDelete(finalCAPTimer);
-    cancelAndDelete(gtsTimer);
-    cancelAndDelete(scanTimer);
+cancelAndDelete(backoffTimer);
+cancelAndDelete(deferCCATimer);
+cancelAndDelete(bcnRxTimer);
+cancelAndDelete(bcnTxTimer);
+cancelAndDelete(ackTimeoutTimer);
+cancelAndDelete(txAckBoundTimer);
+cancelAndDelete(txCmdDataBoundTimer);
+cancelAndDelete(ifsTimer);
+cancelAndDelete(txSDTimer);
+cancelAndDelete(rxSDTimer);
+cancelAndDelete(finalCAPTimer);
+cancelAndDelete(gtsTimer);
+cancelAndDelete(scanTimer);
 
-    rxBuffer.clear();
-    txBuffer.clear();
+rxBuffer.clear();
+txBuffer.clear();
 }
 
