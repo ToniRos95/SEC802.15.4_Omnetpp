@@ -799,6 +799,7 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
 
                             AssoCommand->setPayload(secPacket(AssoCommand->dup()).c_str());
                             DevCapability empty;
+                            empty.addr = AssoCommand->getCapabilityInformation().addr;
                             AssoCommand->setCapabilityInformation(empty);
 
                         }
@@ -2080,18 +2081,7 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
 
                 if (mpib.getMacSecurityEnabled())
                 {
-
-                    /**
-                     std::cout << " TESTO DECIFRATO IN HEX" << endl;
-                     printHex(encoded);
-                     std::cout << endl;
-
-
-                     //std::string authenticated;
-                     //std::string null;
-                     //std::cout << " PARSER" << endl;
-                     //setAPDATA(&authenticated,&null,bcnFrame, bcnFrame->getName(),false);
-                     **/
+                    std::cout << "PEPPINOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO";
 
                     if (aresp->getAsh().secu.Seculevel == 1 || aresp->getAsh().secu.Seculevel == 2 || aresp->getAsh().secu.Seculevel == 3)
                     {
@@ -2101,12 +2091,17 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                     }
                     else if (aresp->getAsh().secu.Seculevel == 5 || aresp->getAsh().secu.Seculevel == 6 || aresp->getAsh().secu.Seculevel == 7)
                     {
-
+                        std::cout << "MARIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
                         std::string encoded = secRecPacket(aresp);
                         std::vector<string> temp = parserSecMessage(encoded, '\x23');
 
+
+                        std::cout << temp[0] << "\n";
+                        std::cout << temp[1]<< "\n";
+
                         unsigned short shortAddress;
                         unsigned short status;
+
                         std::istringstream(temp[0]) >> std::hex >> shortAddress;
                         std::istringstream(temp[1]) >> std::hex >> status;
 
@@ -2930,6 +2925,8 @@ void IEEE802154Mac::genAssoResp(MlmeAssociationStatus status, AssoCmdreq* tmpAss
     assoResp->setSrcPANid(mpib.getMacPANId());
     unsigned char sqnr = mpib.getMacDSN();
     assoResp->setSqnr(sqnr);
+
+    std::cout << "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
 
     if (mpib.getMacSecurityEnabled())
     {
@@ -7577,6 +7574,10 @@ void IEEE802154Mac::setAPDATA(std::string *adata, std::string *pdata, mpdu *fram
             *pdata += '#';
             stream << std::hex << Assoresp->getStatus();
             stream.str("");
+
+            std::cout << "PRIMA DELLA CIFRATURA \n";
+            std::cout << Assoresp->getShortAddress() << "\n";
+            std::cout <<  Assoresp->getStatus() << "\n";
 
         }
 
