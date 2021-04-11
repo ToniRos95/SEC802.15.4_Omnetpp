@@ -2613,6 +2613,7 @@ AckFrame::AckFrame(const char *name, int kind) : ::cPacket(name,kind)
     this->fcs_var = 0;
     this->sqnr_var = 0;
     this->fcf_var = 0;
+    this->mic_var = 0;
 }
 
 AckFrame::AckFrame(const AckFrame& other) : ::cPacket(other)
@@ -2637,6 +2638,7 @@ void AckFrame::copy(const AckFrame& other)
     this->fcs_var = other.fcs_var;
     this->sqnr_var = other.sqnr_var;
     this->fcf_var = other.fcf_var;
+    this->mic_var = other.mic_var;
 }
 
 void AckFrame::parsimPack(cCommBuffer *b)
@@ -2645,6 +2647,7 @@ void AckFrame::parsimPack(cCommBuffer *b)
     doPacking(b,this->fcs_var);
     doPacking(b,this->sqnr_var);
     doPacking(b,this->fcf_var);
+    doPacking(b,this->mic_var);
 }
 
 void AckFrame::parsimUnpack(cCommBuffer *b)
@@ -2653,6 +2656,7 @@ void AckFrame::parsimUnpack(cCommBuffer *b)
     doUnpacking(b,this->fcs_var);
     doUnpacking(b,this->sqnr_var);
     doUnpacking(b,this->fcf_var);
+    doUnpacking(b,this->mic_var);
 }
 
 unsigned short AckFrame::getFcs() const
@@ -2683,6 +2687,16 @@ unsigned short AckFrame::getFcf() const
 void AckFrame::setFcf(unsigned short fcf)
 {
     this->fcf_var = fcf;
+}
+
+const char * AckFrame::getMic() const
+{
+    return mic_var.c_str();
+}
+
+void AckFrame::setMic(const char * mic)
+{
+    this->mic_var = mic;
 }
 
 class AckFrameDescriptor : public cClassDescriptor
@@ -2732,7 +2746,7 @@ const char *AckFrameDescriptor::getProperty(const char *propertyname) const
 int AckFrameDescriptor::getFieldCount(void *object) const
 {
     cClassDescriptor *basedesc = getBaseClassDescriptor();
-    return basedesc ? 3+basedesc->getFieldCount(object) : 3;
+    return basedesc ? 4+basedesc->getFieldCount(object) : 4;
 }
 
 unsigned int AckFrameDescriptor::getFieldTypeFlags(void *object, int field) const
@@ -2747,8 +2761,9 @@ unsigned int AckFrameDescriptor::getFieldTypeFlags(void *object, int field) cons
         FD_ISEDITABLE,
         FD_ISEDITABLE,
         FD_ISEDITABLE,
+        FD_ISEDITABLE,
     };
-    return (field>=0 && field<3) ? fieldTypeFlags[field] : 0;
+    return (field>=0 && field<4) ? fieldTypeFlags[field] : 0;
 }
 
 const char *AckFrameDescriptor::getFieldName(void *object, int field) const
@@ -2763,8 +2778,9 @@ const char *AckFrameDescriptor::getFieldName(void *object, int field) const
         "fcs",
         "sqnr",
         "fcf",
+        "mic",
     };
-    return (field>=0 && field<3) ? fieldNames[field] : NULL;
+    return (field>=0 && field<4) ? fieldNames[field] : NULL;
 }
 
 int AckFrameDescriptor::findField(void *object, const char *fieldName) const
@@ -2774,6 +2790,7 @@ int AckFrameDescriptor::findField(void *object, const char *fieldName) const
     if (fieldName[0]=='f' && strcmp(fieldName, "fcs")==0) return base+0;
     if (fieldName[0]=='s' && strcmp(fieldName, "sqnr")==0) return base+1;
     if (fieldName[0]=='f' && strcmp(fieldName, "fcf")==0) return base+2;
+    if (fieldName[0]=='m' && strcmp(fieldName, "mic")==0) return base+3;
     return basedesc ? basedesc->findField(object, fieldName) : -1;
 }
 
@@ -2789,8 +2806,9 @@ const char *AckFrameDescriptor::getFieldTypeString(void *object, int field) cons
         "unsigned short",
         "unsigned char",
         "unsigned short",
+        "string",
     };
-    return (field>=0 && field<3) ? fieldTypeStrings[field] : NULL;
+    return (field>=0 && field<4) ? fieldTypeStrings[field] : NULL;
 }
 
 const char *AckFrameDescriptor::getFieldProperty(void *object, int field, const char *propertyname) const
@@ -2833,6 +2851,7 @@ std::string AckFrameDescriptor::getFieldAsString(void *object, int field, int i)
         case 0: return ulong2string(pp->getFcs());
         case 1: return ulong2string(pp->getSqnr());
         case 2: return ulong2string(pp->getFcf());
+        case 3: return oppstring2string(pp->getMic());
         default: return "";
     }
 }
@@ -2850,6 +2869,7 @@ bool AckFrameDescriptor::setFieldAsString(void *object, int field, int i, const 
         case 0: pp->setFcs(string2ulong(value)); return true;
         case 1: pp->setSqnr(string2ulong(value)); return true;
         case 2: pp->setFcf(string2ulong(value)); return true;
+        case 3: pp->setMic((value)); return true;
         default: return false;
     }
 }

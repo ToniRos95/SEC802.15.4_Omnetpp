@@ -318,8 +318,11 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         void CBCMACVerify128(std::string plain, std::string mac);
         void setAPDATA(std::string *adata, std::string *pdata, mpdu *frame, bool encryption);
         void setADATA(std::string *adata, mpdu *frame);
+        void setADATAck(std::string *adata, AckFrame* ack);
         std::string secPacket(mpdu *frame);
         std::string secRecPacket(mpdu *frame);
+        std::string secAck(AckFrame* ack, int secuLevel);
+        void secRecAck(AckFrame* ack, int secuLevel);
         void printHex(std::string text);
         std::vector<std::string> parserSecMessage(std::string str, char ch);
         int calcByteMicLenght(bool securityEnable, int secuLevel);

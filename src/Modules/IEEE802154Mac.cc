@@ -1710,62 +1710,22 @@ void IEEE802154Mac::handleBeacon(mpdu *frame)
             {
 
                 std::string encoded = secRecPacket(bcnFrame);
-                std::vector<string> result = parserSecMessage(encoded, '\x23');
-                std::vector<string> sfSpec = parserSecMessage(result[0], '\x2a');
-
                 /**
-                 std::cout << "RXSFSPEC  " << endl;
-                 printHex(sfSpec[0]);
-                 printHex(sfSpec[1]);
-                 printHex(sfSpec[2]);
-                 printHex(sfSpec[3]);
-                 printHex(sfSpec[4]);
-                 printHex(sfSpec[5]);
-                 printHex(sfSpec[6]);
-                 printHex(sfSpec[7]);
-                 std::cout << "RXSFSPEC FINE " << endl;
+                 std::vector<string> result = parserSecMessage(encoded, '\x23');
+                 std::vector<string> sfSpec = parserSecMessage(result[0], '\x2a');
+
+                 unsigned int bi;
+                 unsigned int sd;
+                 std::istringstream(sfSpec[1]) >> std::hex >> bi;
+                 std::istringstream(sfSpec[3]) >> std::hex >> sd;
 
 
-                 std::string str_dec = "1987520";
-                 std::string str_hex = "2f04e009";
-                 std::string str_bin = "-11101001100100111010";
-                 std::string str_auto = "0x7fffff";
-
-                 std::string::size_type sz;   // alias of size_t
-
-                 long li_dec = std::stol (str_dec,&sz);
-                 int li_hex = std::stoi (str_hex,nullptr,16);
-                 long li_bin = std::stol (str_bin,nullptr,2);
-                 long li_auto = std::stol (str_auto,nullptr,0);
-
-                 std::cout << str_dec << ": " << li_dec << '\n';
-                 std::cout << str_hex << ": " << li_hex << '\n';
-                 std::cout << str_bin << ": " << li_bin << '\n';
-                 std::cout << str_auto << ": " << li_auto << '\n';
+                 SuperframeSpec tempSfSpec = { (unsigned char) sfSpec[0][0], bi, (unsigned char) sfSpec[2][0], sd, (unsigned char) sfSpec[4][0],
+                 sfSpec[5][0] == '\x00' ? false : true, sfSpec[6][0] == '\x00' ? false : true,
+                 sfSpec[7][0] == '\x00' ? false : true };
                  **/
-                /**
-                 std::istringstream converter("f000");
-                 unsigned int value;
-                 converter >> std::hex >> value;
-                 **/
-                unsigned int bi;
-                unsigned int sd;
-                std::istringstream(sfSpec[1]) >> std::hex >> bi;
-                std::istringstream(sfSpec[3]) >> std::hex >> sd;
-
-                /**
-                 std::string str_hex = "f000";
-                 long li_hex = std::stol (str_hex,nullptr,16);
-
-
-                 std::cout<< "decimalValue  " << str_hex << ": " << li_hex << '\n';
-                 */
-
-                SuperframeSpec tempSfSpec = { (unsigned char) sfSpec[0][0], bi, (unsigned char) sfSpec[2][0], sd, (unsigned char) sfSpec[4][0],
-                        sfSpec[5][0] == '\x00' ? false : true, sfSpec[6][0] == '\x00' ? false : true,
-                        sfSpec[7][0] == '\x00' ? false : true };
-
-                rxSfSpec = tempSfSpec;
+                bcnFrame->setPayload(encoded.data());
+                rxSfSpec = bcnFrame->getSfSpec();
 
             }
 
@@ -1873,6 +1833,12 @@ void IEEE802154Mac::handleBeacon(mpdu *frame)
 void IEEE802154Mac::handleAck(cMessage* frame)
 {
     AckFrame* ack = check_and_cast<AckFrame*>(frame);
+
+    if (mpib.getMacSecurityEnabled())
+    {
+        secRecAck(ack->dup(),mpib.getSeculevel());
+
+    }
 
     bool ack4me = false;
 
@@ -2889,6 +2855,10 @@ void IEEE802154Mac::genACK(unsigned char dsn, bool fp)
 // Frame Control Field: Page 147 of 2006 revision says all fields except frame pending shall be zero
     ack->setFcf(genFCF(Ack, mpib.getMacSecurityEnabled(), fp, false, false, noAddr, 00, noAddr));
     ack->setFcs(0);
+    if (mpib.getMacSecurityEnabled())
+    {
+        ack->setMic(secAck(ack->dup(), mpib.getSeculevel()).c_str());
+    }
     ack->setByteLength(calcFrameByteLength(ack));
     ASSERT(!txAck); // It's impossible to receive the second packet before the ACK has been sent out!
     txAck = ack;
@@ -4636,7 +4606,8 @@ unsigned char IEEE802154Mac::calcFrameByteLength(cPacket* frame)
         else if (frmType == Ack)
         {
             // 802.15.4-2006 Specs Fig 53: MHR (Frame Control + Sequence Number) + FCS (2)
-            byteLength = SIZE_OF_802154_ACK;
+            int mic = calcByteMicLenght(secEn, mpduFrm->getAsh().secu.Seculevel%4);
+            byteLength = SIZE_OF_802154_ACK + mic;
         }
         else if (frmType == Command)
         {
@@ -5003,8 +4974,8 @@ void IEEE802154Mac::handleBcnTxTimer()
                 {
 
                     tmpBcn->setPayload(secPacket(tmpBcn->dup()).c_str());
-                    SuperframeSpec nullSfspec;
-                    tmpBcn->setSfSpec(nullSfspec);
+                    //SuperframeSpec nullSfspec;
+                    //tmpBcn->setSfSpec(nullSfspec);
 
                 }
 
@@ -7357,6 +7328,8 @@ void IEEE802154Mac::setAPDATA(std::string *adata, std::string *pdata, mpdu *fram
          * */
 
         beaconFrame *tmpBcn = check_and_cast<beaconFrame *>(frame);
+        std::stringstream stream;
+        SuperframeSpec tmp = tmpBcn->getSfSpec();
 
         *adata += tmpBcn->getFcf();
         *adata += '#';
@@ -7380,37 +7353,35 @@ void IEEE802154Mac::setAPDATA(std::string *adata, std::string *pdata, mpdu *fram
         *adata += tmpBcn->getAsh().KeyIdentifier.KeySource;
         *adata += tmpBcn->getAsh().KeyIdentifier.KeyIndex;
         *adata += '#';
+        *adata += tmp.BO;
+        *adata += '*';
+        stream << std::hex << tmp.BI;
+        *adata += stream.str();
+        stream.str("");
+        *adata += '*';
+        *adata += tmp.SO;
+        *adata += '*';
+        stream << std::hex << tmp.SD;
+        *adata += stream.str();
+        stream.str("");
+        *adata += '*';
+        *adata += tmp.finalCap;
+        *adata += '*';
+        *adata += tmp.battLifeExt;
+        *adata += '*';
+        *adata += tmp.panCoor;
+        *adata += '*';
+        *adata += tmp.assoPmt;
+        *adata += '#';
+        //gts
+        *adata += '#';
+        // pending field
+        *adata += '#';
 
         if (encryption)
         {
             //std::string *pdata = ptemp;
-            std::stringstream stream;
-            SuperframeSpec tmp = tmpBcn->getSfSpec();
 
-            *pdata += tmp.BO;
-            *pdata += '*';
-            stream << std::hex << tmp.BI;
-            *pdata += stream.str();
-            stream.str("");
-            *pdata += '*';
-            *pdata += tmp.SO;
-            *pdata += '*';
-            stream << std::hex << tmp.SD;
-            *pdata += stream.str();
-            stream.str("");
-            *pdata += '*';
-            *pdata += tmp.finalCap;
-            *pdata += '*';
-            *pdata += tmp.battLifeExt;
-            *pdata += '*';
-            *pdata += tmp.panCoor;
-            *pdata += '*';
-            *pdata += tmp.assoPmt;
-            *pdata += '#';
-            //gts
-            *pdata += '#';
-            // pending field
-            *pdata += '#';
             *pdata += tmpBcn->getPayload();
         }
 
@@ -7781,6 +7752,14 @@ void IEEE802154Mac::setADATA(std::string *adata, mpdu *frame)
 
 }
 
+void IEEE802154Mac::setADATAck(std::string *adata, AckFrame* ack)
+{
+
+    *adata += ack->getFcf();
+    *adata += ack->getSqnr();
+
+}
+
 std::string IEEE802154Mac::secPacket(mpdu *frame)
 {
 
@@ -7797,19 +7776,16 @@ std::string IEEE802154Mac::secPacket(mpdu *frame)
             setADATA(&adata, frame);
             //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
             result = CBCMACAuth32(adata);
-            frame->setBitLength(frame->getBitLength() + 32);
             break;
         case 2:
             setADATA(&adata, frame);
             //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
             result = CBCMACAuth64(adata);
-            frame->setBitLength(frame->getBitLength() + 64);
             break;
         case 3:
             setADATA(&adata, frame);
             //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
             result = CBCMACAuth128(adata);
-            frame->setBitLength(frame->getBitLength() + 128);
             break;
         case 5:
             setAPDATA(&adata, &pdata, frame, true);
@@ -7923,6 +7899,100 @@ std::string IEEE802154Mac::secRecPacket(mpdu *frame)
      */
 
     return decipherT;
+
+}
+
+std::string IEEE802154Mac::secAck(AckFrame* ack, int secuLevel)
+{
+
+    std::string adata;
+    std::string result;
+
+    switch (secuLevel)
+    {
+        case 1:
+            setADATAck(&adata, ack);
+            result = CBCMACAuth32(adata);
+            break;
+        case 2:
+            setADATAck(&adata, ack);
+            result = CBCMACAuth64(adata);
+            break;
+        case 3:
+            setADATAck(&adata, ack);
+            result = CBCMACAuth128(adata);
+            break;
+        case 5:
+            setADATAck(&adata, ack);
+            result = CBCMACAuth32(adata);
+            break;
+        case 6:
+            setADATAck(&adata, ack);
+            result = CBCMACAuth64(adata);
+            break;
+            ;
+        case 7:
+            setADATAck(&adata, ack);
+            result = CBCMACAuth128(adata);
+            break;
+        default:
+            std::cout << "secuLevel : " << secuLevel << endl;
+            throw cRuntimeError("secuLevel error");
+    }
+
+    return result;
+}
+
+void IEEE802154Mac::secRecAck(AckFrame* ack, int secuLevel)
+{
+    std::string radata;
+    std::string decipherT;
+    std::stringstream temp;
+
+    HexDecoder decoder(new FileSink(temp));
+
+    switch (secuLevel)
+    {
+        case 1:
+            setADATAck(&radata, ack);
+            decoder.Put((const byte *) ack->getMic(), 8);
+            //std::cout << temp.str();
+            CBCMACVerify32(radata, temp.str());
+            break;
+        case 2:
+            setADATAck(&radata, ack);
+            decoder.Put((const byte *) ack->getMic(), 16);
+            //std::cout << temp.str();
+            CBCMACVerify64(radata, temp.str());
+            break;
+        case 3:
+            setADATAck(&radata, ack);
+            decoder.Put((const byte *) ack->getMic(), 32);
+            //std::cout << temp.str();
+            CBCMACVerify128(radata, temp.str());
+            break;
+        case 5:
+            setADATAck(&radata, ack);
+            decoder.Put((const byte *) ack->getMic(), 8);
+            //std::cout << temp.str();
+            CBCMACVerify32(radata, temp.str());
+            break;
+        case 6:
+            setADATAck(&radata, ack);
+            decoder.Put((const byte *) ack->getMic(), 16);
+            //std::cout << temp.str();
+            CBCMACVerify64(radata, temp.str());
+            break;
+        case 7:
+            setADATAck(&radata, ack);
+            decoder.Put((const byte *) ack->getMic(), 32);
+            //std::cout << temp.str();
+            CBCMACVerify128(radata, temp.str());
+            break;
+        default:
+            std::cout << "secuLevel : " << secuLevel << endl;
+            throw cRuntimeError("secuLevel error");
+    }
 
 }
 

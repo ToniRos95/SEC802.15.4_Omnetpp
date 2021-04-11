@@ -118,6 +118,7 @@ packet AckFrame
     unsigned short fcs;     // 16-Bit Frame Check Sequence
     unsigned char sqnr;     // 8-Bit Sequence Number
     unsigned short fcf;     // 16-Bit Framce Control Field
+    string mic;
 }
 
 packet DisAssociation
