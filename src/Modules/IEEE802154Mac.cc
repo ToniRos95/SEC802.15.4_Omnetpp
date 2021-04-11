@@ -2921,8 +2921,6 @@ void IEEE802154Mac::genAssoResp(MlmeAssociationStatus status, AssoCmdreq* tmpAss
     unsigned char sqnr = mpib.getMacDSN();
     assoResp->setSqnr(sqnr);
 
-    std::cout << "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
-
     if (mpib.getMacSecurityEnabled())
     {
 
@@ -4613,17 +4611,21 @@ unsigned char IEEE802154Mac::calcFrameByteLength(cPacket* frame)
         frameType frmType = (frameType) ((frmFcf & ftMask) >> ftShift);
         MHRLength = calcMacHeaderByteLength(((frmFcf & damMask) >> damShift) + ((frmFcf & samMask) >> samShift), (bool) ((frmFcf && secuMask) >> secuShift));
         //macEV << "MAC Header size: " << (int) MHRLength << " Bytes | MAC Footer size: 2 Bytes \n";
+        bool secEn = par("SecurityEnabled").boolValue();
+        //MANCA LA PARTE DI PAYLOAD QUANDO È SOLO AUTENTICATO
 
         if (frmType == Beacon)
         {
-            // 802.15.4-2006 Specs Fig 44: MHR + Payload (variable) + FCS (2)
+            // 802.15.4-2006 Specs Fig 44: MHR + Payload (variable) + FCS (2) + mic + payload
             // TODO Beacon MAC payload size depends on GTS fields and pending address fields
-            byteLength = MHRLength + 6 + 2;
+            //MIC = 4 8 or 16 bytes
+            byteLength = MHRLength + /* 6 + */2 + calcByteMicLenght(secEn, mpduFrm->getAsh().secu.Seculevel) + calcBytePayload(secEn, mpduFrm->getAsh().secu.Seculevel, strlen(mpduFrm->getPayload()));
+
         }
         else if (frmType == Data)
         {
-            // 802.15.4-2006 Specs Fig 52: MHR + Payload (variable) + FCS (2)
-            byteLength = MHRLength + mpduFrm->getEncapsulatedPacket()->getByteLength() + 2; // XXX byteLength of encapsulated MCSP-Data.request
+            // 802.15.4-2006 Specs Fig 52: MHR + Payload (variable) + FCS (2) + mic + payload
+            byteLength = MHRLength + /*mpduFrm->getEncapsulatedPacket()->getByteLength() +*/2 + calcByteMicLenght(secEn, mpduFrm->getAsh().secu.Seculevel) + calcBytePayload(secEn, mpduFrm->getAsh().secu.Seculevel, strlen(mpduFrm->getPayload())); // XXX byteLength of encapsulated MCSP-Data.request
         }
         else if (frmType == Ack)
         {
@@ -4647,14 +4649,14 @@ unsigned char IEEE802154Mac::calcFrameByteLength(cPacket* frame)
             switch (cmdFrm->getCmdType())
             {
                 case Ieee802154_ASSOCIATION_REQUEST: {
-                    // 802.15.4-2006 Specs Fig 55: MHR (17/23) + Payload (2) + FCS (2)
-                    byteLength = MHRLength + 2 + 2;
+                    // 802.15.4-2006 Specs Fig 55: MHR (17/23) + Payload (2) + FCS (2) + mic + payload
+                    byteLength = MHRLength + /*2 +*/2 + calcByteMicLenght(secEn, cmdFrm->getAsh().secu.Seculevel) + calcBytePayload(secEn, cmdFrm->getAsh().secu.Seculevel, strlen(cmdFrm->getPayload()));
                     break;
                 }
 
                 case Ieee802154_ASSOCIATION_RESPONSE: {
-                    // 802.15.4-2006 Specs Fig 57: MHR (23) + Payload (4) + FCS (2)
-                    byteLength = SIZE_OF_802154_ASSOCIATION_RESPONSE;
+                    // 802.15.4-2006 Specs Fig 57: MHR (23) + Payload (4) + FCS (2) + mic + payload
+                    byteLength = SIZE_OF_802154_ASSOCIATION_RESPONSE - 4 + calcByteMicLenght(secEn, cmdFrm->getAsh().secu.Seculevel) + calcBytePayload(secEn, cmdFrm->getAsh().secu.Seculevel, strlen(cmdFrm->getPayload()));
                     break;
                 }
 
@@ -4899,7 +4901,7 @@ void IEEE802154Mac::handleBcnTxTimer()
             //EV << "\n HANDLEBCNTXTIMER \n\n";
             beaconFrame* tmpBcn = new beaconFrame("Ieee802154BEACONTimer");
             tmpBcn->setName("Ieee802154BEACONTimer");
-            tmpBcn->setPayload("Beacon data");
+            //tmpBcn->setPayload("Beacon data");
 
             // construct frame control field
             tmpBcn->setFcf(genFCF(Beacon, mpib.getMacSecurityEnabled(), false, false, false, addrLong, 1, addrLong));
@@ -6462,8 +6464,6 @@ void IEEE802154Mac::resetTRX()
 std::string IEEE802154Mac::AEADCypher32(std::string adata, std::string pdata)
 {
 
-    //std::cout << "PORCA MADONNACCIAAAAAAAAAAAAAAAAAAAAAA" << secuLevel;
-
     byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
 
     byte iv[] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b };
@@ -6475,8 +6475,6 @@ std::string IEEE802154Mac::AEADCypher32(std::string adata, std::string pdata)
     HexEncoder encoder(new FileSink(temp));
 
     const int TAG_SIZE = 4;
-
-    std::cout << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: " << TAG_SIZE << endl;
 
     try
     {
@@ -6522,8 +6520,6 @@ std::string IEEE802154Mac::AEADCypher32(std::string adata, std::string pdata)
 std::string IEEE802154Mac::AEADCypher64(std::string adata, std::string pdata)
 {
 
-    //std::cout << "PORCA MADONNACCIAAAAAAAAAAAAAAAAAAAAAA" << secuLevel;
-
     byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
 
     byte iv[] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b };
@@ -6535,8 +6531,6 @@ std::string IEEE802154Mac::AEADCypher64(std::string adata, std::string pdata)
     HexEncoder encoder(new FileSink(temp));
 
     const int TAG_SIZE = 8;
-
-    std::cout << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: " << TAG_SIZE << endl;
 
     try
     {
@@ -6582,8 +6576,6 @@ std::string IEEE802154Mac::AEADCypher64(std::string adata, std::string pdata)
 std::string IEEE802154Mac::AEADCypher128(std::string adata, std::string pdata)
 {
 
-    //std::cout << "PORCA MADONNACCIAAAAAAAAAAAAAAAAAAAAAA" << secuLevel;
-
     byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
 
     byte iv[] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b };
@@ -6595,7 +6587,6 @@ std::string IEEE802154Mac::AEADCypher128(std::string adata, std::string pdata)
     HexEncoder encoder(new FileSink(temp));
 
     const int TAG_SIZE = 16;
-    std::cout << "\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa tagsize: " << TAG_SIZE << endl;
 
     try
     {
@@ -7697,7 +7688,6 @@ void IEEE802154Mac::setADATA(std::string *adata, mpdu *frame)
         AssoCmdreq* AssoCmd = check_and_cast<AssoCmdreq *>(frame);
         DevCapability tmp = AssoCmd->getCapabilityInformation();
 
-
         *adata += AssoCmd->getFcf();
         *adata += '#';
         //frame control
@@ -7777,296 +7767,349 @@ void IEEE802154Mac::setADATA(std::string *adata, mpdu *frame)
         stream.str("");
 
     }
-return;
+    return;
 
 }
 
 std::string IEEE802154Mac::secPacket(mpdu *frame)
 {
 
-/**adata è la parte di messaggio che viene mandata in chiaro e deve essere autenticata
- * pdata è la parte di messaggio che deve essere cifrata
- *
- */
-std::string adata, pdata;
-std::string result;
+    /**adata è la parte di messaggio che viene mandata in chiaro e deve essere autenticata
+     * pdata è la parte di messaggio che deve essere cifrata
+     *
+     */
+    std::string adata, pdata;
+    std::string result;
 
-switch (frame->getAsh().secu.Seculevel)
-{
-    case 1:
-        setADATA(&adata, frame);
-        //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
-        result = CBCMACAuth32(adata);
-        break;
-    case 2:
-        setADATA(&adata, frame);
-        //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
-        result = CBCMACAuth64(adata);
-        break;
-    case 3:
-        setADATA(&adata, frame);
-        //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
-        result = CBCMACAuth128(adata);
-        break;
-    case 5:
-        setAPDATA(&adata, &pdata, frame, true);
-        result = AEADCypher32(adata, pdata);
-        break;
-    case 6:
-        setAPDATA(&adata, &pdata, frame, true);
-        result = AEADCypher64(adata, pdata);
-        break;
-    case 7:
-        setAPDATA(&adata, &pdata, frame, true);
-        result = AEADCypher128(adata, pdata);
-        break;
-    default:
-        std::cout << "secuLevel : " << frame->getAsh().secu.Seculevel << endl;
-        throw cRuntimeError("secuLevel error");
-}
+    switch (frame->getAsh().secu.Seculevel)
+    {
+        case 1:
+            setADATA(&adata, frame);
+            //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
+            result = CBCMACAuth32(adata);
+            frame->setBitLength(frame->getBitLength() + 32);
+            break;
+        case 2:
+            setADATA(&adata, frame);
+            //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
+            result = CBCMACAuth64(adata);
+            frame->setBitLength(frame->getBitLength() + 64);
+            break;
+        case 3:
+            setADATA(&adata, frame);
+            //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
+            result = CBCMACAuth128(adata);
+            frame->setBitLength(frame->getBitLength() + 128);
+            break;
+        case 5:
+            setAPDATA(&adata, &pdata, frame, true);
+            result = AEADCypher32(adata, pdata);
+            break;
+        case 6:
+            setAPDATA(&adata, &pdata, frame, true);
+            result = AEADCypher64(adata, pdata);
+            break;
+        case 7:
+            setAPDATA(&adata, &pdata, frame, true);
+            result = AEADCypher128(adata, pdata);
+            break;
+        default:
+            std::cout << "secuLevel : " << frame->getAsh().secu.Seculevel << endl;
+            throw cRuntimeError("secuLevel error");
+    }
 
-/*
- std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
- std::cout << adata;
- std::cout << std::endl << std::endl;
- std::cout << " TESTO ADATA IN HEX" << endl;
- printHex(adata);
- std::cout << endl << endl;
- std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
- << std::endl;
- std::cout << pdata;
- std::cout << std::endl << std::endl;
- std::cout << " TESTO IN CHIARO IN HEX" << endl;
- printHex(pdata);
- std::cout << endl << endl;
- std::cout << " TESTO CIFRATO IN HEX" << endl;
- printHex(cipherT);
- std::cout << endl << endl;
- */
+    /*
+     std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
+     std::cout << adata;
+     std::cout << std::endl << std::endl;
+     std::cout << " TESTO ADATA IN HEX" << endl;
+     printHex(adata);
+     std::cout << endl << endl;
+     std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
+     << std::endl;
+     std::cout << pdata;
+     std::cout << std::endl << std::endl;
+     std::cout << " TESTO IN CHIARO IN HEX" << endl;
+     printHex(pdata);
+     std::cout << endl << endl;
+     std::cout << " TESTO CIFRATO IN HEX" << endl;
+     printHex(cipherT);
+     std::cout << endl << endl;
+     */
 
-return result;
+    return result;
 
 }
 
 std::string IEEE802154Mac::secRecPacket(mpdu *frame)
 {
 
-std::string radata;
-std::string null;
+    std::string radata;
+    std::string null;
 //std::string cipher = frame->getPayload();
-std::string decipherT;
-std::stringstream temp;
+    std::string decipherT;
+    std::stringstream temp;
 
-HexDecoder decoder(new FileSink(temp));
+    HexDecoder decoder(new FileSink(temp));
 
-switch (frame->getAsh().secu.Seculevel)
-{
-    case 1:
-        setADATA(&radata, frame);
-        decoder.Put((const byte *) frame->getMic(), 8);
-        //std::cout << temp.str();
-        CBCMACVerify32(radata, temp.str());
+    switch (frame->getAsh().secu.Seculevel)
+    {
+        case 1:
+            setADATA(&radata, frame);
+            decoder.Put((const byte *) frame->getMic(), 8);
+            //std::cout << temp.str();
+            CBCMACVerify32(radata, temp.str());
 
-        break;
-    case 2:
-        setADATA(&radata, frame);
-        decoder.Put((const byte *) frame->getMic(), 16);
-        //std::cout << temp.str();
-        CBCMACVerify64(radata, temp.str());
-        break;
-    case 3:
-        setADATA(&radata, frame);
-        decoder.Put((const byte *) frame->getMic(), 32);
-        //std::cout << temp.str();
-        CBCMACVerify128(radata, temp.str());
-        break;
-    case 5:
-        setAPDATA(&radata, &null, frame, false);
-        decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
-        decipherT = AEADDecypher32(temp.str(), radata);
-        break;
-    case 6:
-        setAPDATA(&radata, &null, frame, false);
-        decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
-        decipherT = AEADDecypher64(temp.str(), radata);
-        break;
-    case 7:
-        setAPDATA(&radata, &null, frame, false);
-        decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
-        decipherT = AEADDecypher128(temp.str(), radata);
-        break;
-    default:
-        std::cout << "secuLevel : " << frame->getAsh().secu.Seculevel << endl;
-        throw cRuntimeError("secuLevel error");
-}
+            break;
+        case 2:
+            setADATA(&radata, frame);
+            decoder.Put((const byte *) frame->getMic(), 16);
+            //std::cout << temp.str();
+            CBCMACVerify64(radata, temp.str());
+            break;
+        case 3:
+            setADATA(&radata, frame);
+            decoder.Put((const byte *) frame->getMic(), 32);
+            //std::cout << temp.str();
+            CBCMACVerify128(radata, temp.str());
+            break;
+        case 5:
+            setAPDATA(&radata, &null, frame, false);
+            decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
+            decipherT = AEADDecypher32(temp.str(), radata);
+            break;
+        case 6:
+            setAPDATA(&radata, &null, frame, false);
+            decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
+            decipherT = AEADDecypher64(temp.str(), radata);
+            break;
+        case 7:
+            setAPDATA(&radata, &null, frame, false);
+            decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
+            decipherT = AEADDecypher128(temp.str(), radata);
+            break;
+        default:
+            std::cout << "secuLevel : " << frame->getAsh().secu.Seculevel << endl;
+            throw cRuntimeError("secuLevel error");
+    }
 
-/*
- std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
- std::cout << adata;
- std::cout << std::endl << std::endl;
- std::cout << " TESTO ADATA IN HEX" << endl;
- printHex(adata);
- std::cout << endl << endl;
- std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
- << std::endl;
- std::cout << pdata;
- std::cout << std::endl << std::endl;
- std::cout << " TESTO IN CHIARO IN HEX" << endl;
- printHex(pdata);
- std::cout << endl << endl;
- std::cout << " TESTO CIFRATO IN HEX" << endl;
- printHex(cipherT);
- std::cout << endl << endl;
- */
+    /*
+     std::cout << "CIFRATURA a Text (" << adata.size() << " bytes)" << std::endl;
+     std::cout << adata;
+     std::cout << std::endl << std::endl;
+     std::cout << " TESTO ADATA IN HEX" << endl;
+     printHex(adata);
+     std::cout << endl << endl;
+     std::cout << "CIFRATURA Plain Text (" << pdata.size() << " bytes)"
+     << std::endl;
+     std::cout << pdata;
+     std::cout << std::endl << std::endl;
+     std::cout << " TESTO IN CHIARO IN HEX" << endl;
+     printHex(pdata);
+     std::cout << endl << endl;
+     std::cout << " TESTO CIFRATO IN HEX" << endl;
+     printHex(cipherT);
+     std::cout << endl << endl;
+     */
 
-return decipherT;
+    return decipherT;
 
 }
 
 void IEEE802154Mac::printHex(std::string text)
 {
 
-for (int i = 0; i < text.size(); i++)
-{
+    for (int i = 0; i < text.size(); i++)
+    {
 
-    std::cout << std::hex << (0xFF & static_cast<byte>(text[i])) << " ";
+        std::cout << std::hex << (0xFF & static_cast<byte>(text[i])) << " ";
 
-}
-std::cout << endl;
+    }
+    std::cout << endl;
 }
 
 vector<string> IEEE802154Mac::parserSecMessage(std::string str, char ch)
 {
 
-string next;
-vector<string> result;
+    string next;
+    vector<string> result;
 
 // For each character in the string
-for (string::const_iterator it = str.begin(); it != str.end(); it++)
-{
-    // If we've hit the terminal character
-    if (*it == ch)
+    for (string::const_iterator it = str.begin(); it != str.end(); it++)
     {
-        // If we have some characters accumulated
-        //if (!next.empty()) {
-        // Add them to the result vector
-        result.push_back(next);
-        next.clear();
-        //}
+        // If we've hit the terminal character
+        if (*it == ch)
+        {
+            // If we have some characters accumulated
+            //if (!next.empty()) {
+            // Add them to the result vector
+            result.push_back(next);
+            next.clear();
+            //}
+        }
+        else
+        {
+            // Accumulate the next character into the sequence
+            next += *it;
+        }
     }
-    else
+    if (!next.empty())
+        result.push_back(next);
+
+    return result;
+    /*
+     *
+     * METODO PER STAMPARE IL RISULTATO DEL PARSER
+     *
+     for (size_t i = 0; i < result.size(); i++) {
+     cout << "\"" << result[i] << "\"" << endl;
+     }
+     */
+}
+
+int IEEE802154Mac::calcByteMicLenght(bool securityEnable, int secuLevel)
+{
+
+    if (!securityEnable)
+        return 0;
+
+    switch (secuLevel)
     {
-        // Accumulate the next character into the sequence
-        next += *it;
+        case 1:
+            return 4;
+        case 2:
+            return 8;
+        case 3:
+            return 16;
+        default:
+            return 0;
     }
 }
-if (!next.empty())
-    result.push_back(next);
 
-return result;
-/*
- *
- * METODO PER STAMPARE IL RISULTATO DEL PARSER
- *
- for (size_t i = 0; i < result.size(); i++) {
- cout << "\"" << result[i] << "\"" << endl;
- }
- */
+int IEEE802154Mac::calcBytePayload(bool securityEnable, int secuLevel, int lenghtPayload)
+{
+    //il tutto serve per arrotondare il pacchetto cifrato alla lunghezza di un multiplo di 128bit (16byte)
+
+    /**
+     int tmp = lenghtPayload;
+     switch (secuLevel)
+     {
+     case 5:
+     tmp += 4;
+     case 6:
+     tmp += 8;
+     case 7:
+     tmp += 16;
+     default:
+     return lenghtPayload;
+     }
+     int x = tmp % 16;
+     return tmp + (16-x);
+
+     **/
+
+    std::cout << "\n \n" << lenghtPayload << "\n \n";
+
+    if ((secuLevel == 5 || secuLevel == 6 || secuLevel == 7) && securityEnable)
+        return lenghtPayload / 2;
+    else
+        return lenghtPayload;
+
 }
 
 /***************************** DA QUI IN POI È ROBA LORO *******************************/
 
 void IEEE802154Mac::finish()
 {
-double currentTime = simTime().dbl();
-if (currentTime == 0)
-{
+    double currentTime = simTime().dbl();
+    if (currentTime == 0)
+    {
+        return;
+    }
+
+    recordScalar("Total simulation time", currentTime);
+    recordScalar("Total num of upper pkts received", numUpperPkt);
+    recordScalar("Num of upper pkts dropped", numUpperPktLost);
+    recordScalar("Num of BEACON pkts sent", numTxBcnPkt);
+    recordScalar("Num of DATA pkts sent successfully", numTxDataSucc);
+    recordScalar("Num of DATA pkts failed", numTxDataFail);
+    recordScalar("Num of DATA pkts sent successfully in GTS", numTxGTSSucc);
+    recordScalar("Num of DATA pkts failed in GTS", numTxGTSFail);
+    recordScalar("Num of ACK pkts sent", numTxAckPkt);
+    recordScalar("Num of BEACON pkts received", numRxBcnPkt);
+    recordScalar("Num of BEACON pkts lost", numLostBcn);
+    recordScalar("Num of DATA pkts received", numRxDataPkt);
+    recordScalar("Num of DATA pkts received in GTS", numRxGTSPkt);
+    recordScalar("Num of ACK pkts received", numRxAckPkt);
+    recordScalar("Num of collisions", numCollisions);
+    recordScalar("Num of bit errors", numBitErrors);
+
     return;
-}
-
-recordScalar("Total simulation time", currentTime);
-recordScalar("Total num of upper pkts received", numUpperPkt);
-recordScalar("Num of upper pkts dropped", numUpperPktLost);
-recordScalar("Num of BEACON pkts sent", numTxBcnPkt);
-recordScalar("Num of DATA pkts sent successfully", numTxDataSucc);
-recordScalar("Num of DATA pkts failed", numTxDataFail);
-recordScalar("Num of DATA pkts sent successfully in GTS", numTxGTSSucc);
-recordScalar("Num of DATA pkts failed in GTS", numTxGTSFail);
-recordScalar("Num of ACK pkts sent", numTxAckPkt);
-recordScalar("Num of BEACON pkts received", numRxBcnPkt);
-recordScalar("Num of BEACON pkts lost", numLostBcn);
-recordScalar("Num of DATA pkts received", numRxDataPkt);
-recordScalar("Num of DATA pkts received in GTS", numRxGTSPkt);
-recordScalar("Num of ACK pkts received", numRxAckPkt);
-recordScalar("Num of collisions", numCollisions);
-recordScalar("Num of bit errors", numBitErrors);
-
-return;
 }
 
 IEEE802154Mac::IEEE802154Mac()
 {
-txPkt = NULL;
-txBeacon = NULL;
-txBcnCmdUpper = NULL;
-txBcnCmd = NULL;
-txData = NULL;
-txGTS = NULL;
-txAck = NULL;
-txCsmaca = NULL;
-tmpCsmaca = NULL;
-rxBeacon = NULL;
-txGTSReq = NULL;
-rxData = NULL;
-rxCmd = NULL;
+    txPkt = NULL;
+    txBeacon = NULL;
+    txBcnCmdUpper = NULL;
+    txBcnCmd = NULL;
+    txData = NULL;
+    txGTS = NULL;
+    txAck = NULL;
+    txCsmaca = NULL;
+    tmpCsmaca = NULL;
+    rxBeacon = NULL;
+    txGTSReq = NULL;
+    rxData = NULL;
+    rxCmd = NULL;
 
-for (unsigned char i = 0; i <= 26; i++)
-{
-    scanPANDescriptorList[i].CoordAddrMode = 0;
-    scanPANDescriptorList[i].CoordPANId = 0;
-    scanPANDescriptorList[i].CoordAddress = MACAddressExt::UNSPECIFIED_ADDRESS;
-    scanPANDescriptorList[i].LogicalChannel = 0;
-    scanPANDescriptorList[i].GTSPermit = false;
-    scanPANDescriptorList[i].LinkQuality = 0;
-    scanPANDescriptorList[i].SecurityUse = false;
-    scanPANDescriptorList[i].ACLEntry = 0;
-    scanPANDescriptorList[i].SecurityFailure = false;
-}
+    for (unsigned char i = 0; i <= 26; i++)
+    {
+        scanPANDescriptorList[i].CoordAddrMode = 0;
+        scanPANDescriptorList[i].CoordPANId = 0;
+        scanPANDescriptorList[i].CoordAddress = MACAddressExt::UNSPECIFIED_ADDRESS;
+        scanPANDescriptorList[i].LogicalChannel = 0;
+        scanPANDescriptorList[i].GTSPermit = false;
+        scanPANDescriptorList[i].LinkQuality = 0;
+        scanPANDescriptorList[i].SecurityUse = false;
+        scanPANDescriptorList[i].ACLEntry = 0;
+        scanPANDescriptorList[i].SecurityFailure = false;
+    }
 
 // timers
-backoffTimer = NULL;
-deferCCATimer = NULL;
-bcnRxTimer = NULL;
-bcnTxTimer = NULL;
-ackTimeoutTimer = NULL;
-txAckBoundTimer = NULL;
-txCmdDataBoundTimer = NULL;
-ifsTimer = NULL;
-txSDTimer = NULL;
-rxSDTimer = NULL;
-finalCAPTimer = NULL;
-gtsTimer = NULL;
-scanTimer = NULL;
+    backoffTimer = NULL;
+    deferCCATimer = NULL;
+    bcnRxTimer = NULL;
+    bcnTxTimer = NULL;
+    ackTimeoutTimer = NULL;
+    txAckBoundTimer = NULL;
+    txCmdDataBoundTimer = NULL;
+    ifsTimer = NULL;
+    txSDTimer = NULL;
+    rxSDTimer = NULL;
+    finalCAPTimer = NULL;
+    gtsTimer = NULL;
+    scanTimer = NULL;
 }
 
 IEEE802154Mac::~IEEE802154Mac()
 {
 // delete all possibly running Timers
-cancelAndDelete(backoffTimer);
-cancelAndDelete(deferCCATimer);
-cancelAndDelete(bcnRxTimer);
-cancelAndDelete(bcnTxTimer);
-cancelAndDelete(ackTimeoutTimer);
-cancelAndDelete(txAckBoundTimer);
-cancelAndDelete(txCmdDataBoundTimer);
-cancelAndDelete(ifsTimer);
-cancelAndDelete(txSDTimer);
-cancelAndDelete(rxSDTimer);
-cancelAndDelete(finalCAPTimer);
-cancelAndDelete(gtsTimer);
-cancelAndDelete(scanTimer);
+    cancelAndDelete(backoffTimer);
+    cancelAndDelete(deferCCATimer);
+    cancelAndDelete(bcnRxTimer);
+    cancelAndDelete(bcnTxTimer);
+    cancelAndDelete(ackTimeoutTimer);
+    cancelAndDelete(txAckBoundTimer);
+    cancelAndDelete(txCmdDataBoundTimer);
+    cancelAndDelete(ifsTimer);
+    cancelAndDelete(txSDTimer);
+    cancelAndDelete(rxSDTimer);
+    cancelAndDelete(finalCAPTimer);
+    cancelAndDelete(gtsTimer);
+    cancelAndDelete(scanTimer);
 
-rxBuffer.clear();
-txBuffer.clear();
+    rxBuffer.clear();
+    txBuffer.clear();
 }
 
