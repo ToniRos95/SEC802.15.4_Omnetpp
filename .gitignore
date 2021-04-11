@@ -1,3 +1,4 @@
-/out/
-/simulations/result/
+out/
+simulations/results/
+simulation/core
 src/IEEE802154INET-Standalone

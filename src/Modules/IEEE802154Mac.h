@@ -323,7 +323,7 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         void printHex(std::string text);
         std::vector<std::string> parserSecMessage(std::string str, char ch);
         int calcByteMicLenght(bool securityEnable, int secuLevel);
-        int calcBytePayload(bool securityEnable, int secuLevel, int lenghtPayload);
+        int calcBytePayload(int type, bool securityEnable, int secuLevel);
 
     private:
 

@@ -563,7 +563,7 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
             {
                 taskP.mcps_data_request_TxOption = DIRECT_TRANS;
                 data->setFcf(genFCF(Data, false, false, false, false, addrLong, 01, addrLong));
-                data->setByteLength(calcFrameByteLength(data));
+                //data->setByteLength(calcFrameByteLength(data));
                 data->setIsGTS(false);
                 taskP.taskStep(task)++; // advance to next task step
                 strcpy
@@ -578,7 +578,7 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
             {
                 taskP.mcps_data_request_TxOption = DIRECT_TRANS;
                 data->setFcf(genFCF(Data, false, false, true, false, addrLong, 01, addrLong));
-                data->setByteLength(calcFrameByteLength(data));
+                //data->setByteLength(calcFrameByteLength(data));
                 data->setIsGTS(false);
                 waitDataAck = true;
                 taskP.taskStep(task)++; // advance to next task step
@@ -593,7 +593,7 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
             case 2:  // direct GTS noACK
             {
                 data->setFcf(genFCF(Data, false, false, false, false, addrLong, 01, addrLong));
-                data->setByteLength(calcFrameByteLength(data));
+                //data->setByteLength(calcFrameByteLength(data));
                 taskP.mcps_data_request_TxOption = GTS_TRANS;
                 data->setIsGTS(true);
                 waitDataAck = false;
@@ -610,7 +610,7 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
             {
                 taskP.mcps_data_request_TxOption = GTS_TRANS;
                 data->setFcf(genFCF(Data, false, false, true, false, addrLong, 01, addrLong));
-                data->setByteLength(calcFrameByteLength(data));
+                //data->setByteLength(calcFrameByteLength(data));
                 data->setIsGTS(true);
                 waitDataAck = true;
                 taskP.taskStep(task)++; // advance to next task step
@@ -626,7 +626,7 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
             {
                 taskP.mcps_data_request_TxOption = DIRECT_TRANS; // it's still indirect
                 data->setFcf(genFCF(Data, false, false, false, false, addrLong, 01, addrLong));
-                data->setByteLength(calcFrameByteLength(data));
+                //data->setByteLength(calcFrameByteLength(data));
                 data->setIsGTS(false);
                 data->setIsIndirect(true);
                 waitDataAck = false;
@@ -643,7 +643,7 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
             {
                 taskP.mcps_data_request_TxOption = DIRECT_TRANS; // it's still indirect ...
                 data->setFcf(genFCF(Data, false, false, true, false, addrLong, 01, addrLong));
-                data->setByteLength(calcFrameByteLength(data));
+                //data->setByteLength(calcFrameByteLength(data));
                 data->setIsGTS(false);
                 data->setIsIndirect(true);
                 waitDataAck = true;
@@ -686,6 +686,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
         }
 
         //FINEEEEEEEEEEEEEE SICUREZZAAAAAAAAAAAAAAAAA
+
+        data->setByteLength(calcFrameByteLength(data));
 
         if (dataReq->getTxOptions() == 2 || dataReq->getTxOptions() == 3)
         {
@@ -4619,13 +4621,17 @@ unsigned char IEEE802154Mac::calcFrameByteLength(cPacket* frame)
             // 802.15.4-2006 Specs Fig 44: MHR + Payload (variable) + FCS (2) + mic + payload
             // TODO Beacon MAC payload size depends on GTS fields and pending address fields
             //MIC = 4 8 or 16 bytes
-            byteLength = MHRLength + /* 6 + */2 + calcByteMicLenght(secEn, mpduFrm->getAsh().secu.Seculevel) + calcBytePayload(secEn, mpduFrm->getAsh().secu.Seculevel, strlen(mpduFrm->getPayload()));
+            int mic = calcByteMicLenght(secEn, mpduFrm->getAsh().secu.Seculevel);
+            int payload = calcBytePayload(0, secEn, mpduFrm->getAsh().secu.Seculevel);
+            byteLength = MHRLength + /* 6 + */2 + mic + payload;
 
         }
         else if (frmType == Data)
         {
             // 802.15.4-2006 Specs Fig 52: MHR + Payload (variable) + FCS (2) + mic + payload
-            byteLength = MHRLength + /*mpduFrm->getEncapsulatedPacket()->getByteLength() +*/2 + calcByteMicLenght(secEn, mpduFrm->getAsh().secu.Seculevel) + calcBytePayload(secEn, mpduFrm->getAsh().secu.Seculevel, strlen(mpduFrm->getPayload())); // XXX byteLength of encapsulated MCSP-Data.request
+            int mic = calcByteMicLenght(secEn, mpduFrm->getAsh().secu.Seculevel);
+            int payload = calcBytePayload(1, secEn, mpduFrm->getAsh().secu.Seculevel);
+            byteLength = MHRLength + /*mpduFrm->getEncapsulatedPacket()->getByteLength() +*/2 + mic + payload; // XXX byteLength of encapsulated MCSP-Data.request
         }
         else if (frmType == Ack)
         {
@@ -4650,13 +4656,17 @@ unsigned char IEEE802154Mac::calcFrameByteLength(cPacket* frame)
             {
                 case Ieee802154_ASSOCIATION_REQUEST: {
                     // 802.15.4-2006 Specs Fig 55: MHR (17/23) + Payload (2) + FCS (2) + mic + payload
-                    byteLength = MHRLength + /*2 +*/2 + calcByteMicLenght(secEn, cmdFrm->getAsh().secu.Seculevel) + calcBytePayload(secEn, cmdFrm->getAsh().secu.Seculevel, strlen(cmdFrm->getPayload()));
+                    int mic = calcByteMicLenght(secEn, cmdFrm->getAsh().secu.Seculevel);
+                    int payload = calcBytePayload(2, secEn, cmdFrm->getAsh().secu.Seculevel);
+                    byteLength = MHRLength + /*2 +*/2 + mic + payload;
                     break;
                 }
 
                 case Ieee802154_ASSOCIATION_RESPONSE: {
                     // 802.15.4-2006 Specs Fig 57: MHR (23) + Payload (4) + FCS (2) + mic + payload
-                    byteLength = SIZE_OF_802154_ASSOCIATION_RESPONSE - 4 + calcByteMicLenght(secEn, cmdFrm->getAsh().secu.Seculevel) + calcBytePayload(secEn, cmdFrm->getAsh().secu.Seculevel, strlen(cmdFrm->getPayload()));
+                    int mic = calcByteMicLenght(secEn, cmdFrm->getAsh().secu.Seculevel);
+                    int payload = calcBytePayload(3, secEn, cmdFrm->getAsh().secu.Seculevel);
+                    byteLength = SIZE_OF_802154_ASSOCIATION_RESPONSE - 4 + mic + payload;
                     break;
                 }
 
@@ -4901,7 +4911,7 @@ void IEEE802154Mac::handleBcnTxTimer()
             //EV << "\n HANDLEBCNTXTIMER \n\n";
             beaconFrame* tmpBcn = new beaconFrame("Ieee802154BEACONTimer");
             tmpBcn->setName("Ieee802154BEACONTimer");
-            //tmpBcn->setPayload("Beacon data");
+            tmpBcn->setPayload("payload0");
 
             // construct frame control field
             tmpBcn->setFcf(genFCF(Beacon, mpib.getMacSecurityEnabled(), false, false, false, addrLong, 1, addrLong));
@@ -6910,10 +6920,10 @@ std::string IEEE802154Mac::CBCMACAuth32(std::string plain)
         mac.resize(4);
         cbcmac.Final((byte*) &mac[0]);
 
-        std::cout << "MAC (" << mac.size() << " bytes)" << std::endl;
+        //std::cout << "MAC (" << mac.size() << " bytes)" << std::endl;
         stamp.Put((const byte*) mac.data(), mac.size());
         stamp.MessageEnd();
-        std::cout << std::endl << std::endl;
+        //std::cout << std::endl << std::endl;
 
         /**
          std::cout << "Testo in chiaro (" << plain.size() << " bytes)" << std::endl;
@@ -6982,10 +6992,10 @@ std::string IEEE802154Mac::CBCMACAuth64(std::string plain)
         mac.resize(8);
         cbcmac.Final((byte*) &mac[0]);
 
-        std::cout << "MAC (" << mac.size() << " bytes)" << std::endl;
+        //std::cout << "MAC (" << mac.size() << " bytes)" << std::endl;
         stamp.Put((const byte*) mac.data(), mac.size());
         stamp.MessageEnd();
-        std::cout << std::endl << std::endl;
+        //std::cout << std::endl << std::endl;
 
         /**
          std::cout << "Testo in chiaro (" << plain.size() << " bytes)" << std::endl;
@@ -7054,10 +7064,10 @@ std::string IEEE802154Mac::CBCMACAuth128(std::string plain)
         mac.resize(16);
         cbcmac.Final((byte*) &mac[0]);
 
-        std::cout << "MAC (" << mac.size() << " bytes)" << std::endl;
+        //std::cout << "MAC (" << mac.size() << " bytes)" << std::endl;
         stamp.Put((const byte*) mac.data(), mac.size());
         stamp.MessageEnd();
-        std::cout << std::endl << std::endl;
+        //std::cout << std::endl << std::endl;
 
         /**
          std::cout << "Testo in chiaro (" << plain.size() << " bytes)" << std::endl;
@@ -7122,10 +7132,10 @@ void IEEE802154Mac::CBCMACVerify32(std::string plain, std::string mac)
 
     // Verify
 
-    std::cout << "MAC  verify (" << mac.size() << " bytes)" << std::endl;
+    //std::cout << "MAC  verify (" << mac.size() << " bytes)" << std::endl;
     encoder.Put((const byte *) mac.data(), mac.size());
     encoder.MessageEnd();
-    std::cout << std::endl << std::endl;
+    //std::cout << std::endl << std::endl;
 
     try
     {
@@ -7195,10 +7205,10 @@ void IEEE802154Mac::CBCMACVerify64(std::string plain, std::string mac)
 
     // Verify
 
-    std::cout << "MAC  verify (" << mac.size() << " bytes)" << std::endl;
+    //std::cout << "MAC  verify (" << mac.size() << " bytes)" << std::endl;
     encoder.Put((const byte *) mac.data(), mac.size());
     encoder.MessageEnd();
-    std::cout << std::endl << std::endl;
+    //std::cout << std::endl << std::endl;
 
     try
     {
@@ -7268,10 +7278,10 @@ void IEEE802154Mac::CBCMACVerify128(std::string plain, std::string mac)
 
     // Verify
 
-    std::cout << "MAC  verify (" << mac.size() << " bytes)" << std::endl;
+    //std::cout << "MAC  verify (" << mac.size() << " bytes)" << std::endl;
     encoder.Put((const byte *) mac.data(), mac.size());
     encoder.MessageEnd();
-    std::cout << std::endl << std::endl;
+    //std::cout << std::endl << std::endl;
 
     try
     {
@@ -7986,7 +7996,7 @@ int IEEE802154Mac::calcByteMicLenght(bool securityEnable, int secuLevel)
     }
 }
 
-int IEEE802154Mac::calcBytePayload(bool securityEnable, int secuLevel, int lenghtPayload)
+int IEEE802154Mac::calcBytePayload(int type, bool securityEnable, int secuLevel)
 {
     //il tutto serve per arrotondare il pacchetto cifrato alla lunghezza di un multiplo di 128bit (16byte)
 
@@ -8008,13 +8018,116 @@ int IEEE802154Mac::calcBytePayload(bool securityEnable, int secuLevel, int lengh
 
      **/
 
-    std::cout << "\n \n" << lenghtPayload << "\n \n";
+    /**
+     std::cout << "\n \n ASDF : " << lenghtPayload << "\n \n";
 
-    if ((secuLevel == 5 || secuLevel == 6 || secuLevel == 7) && securityEnable)
-        return lenghtPayload / 2;
+     if ((secuLevel == 5 || secuLevel == 6 || secuLevel == 7) && securityEnable)
+     return lenghtPayload / 2;
+     else
+     return lenghtPayload;
+
+     **/
+
+    /**type:
+     * 0 beacon
+     * 1 data
+     * 2 assoreq
+     * 3 assoresp
+     */
+
+    //come esempio ogni contenuto "payload" ha al suo interno la stringa "payload0" che sono 8 byte di informazione
+    int lenght = 0;
+
+    if (securityEnable)
+    {
+        switch (type)
+        {
+            case 0: //beacon
+
+                lenght += 6;  //mac payload senza beacon payload
+                if (secuLevel == 5)
+                    lenght += 16;   // 8byte +4 byte e arriva a 16;
+                else if (secuLevel == 6)
+                    lenght += 16;     //8byte +8 byte
+                else if (secuLevel == 7)
+                    lenght += 32;     //8 byte + 16 e si arrotonda a 32;
+                else
+                    lenght += 8;
+                break;
+
+            case 1: //data
+
+                //lenght += 6;  //mac payload senza beacon payload
+                if (secuLevel == 5)
+                    lenght += 16;   // 8byte +4 byte e arriva a 16;
+                else if (secuLevel == 6)
+                    lenght += 16;     //8byte +8 byte
+                else if (secuLevel == 7)
+                    lenght += 32;     //8 byte + 16 e si arrotonda a 32;
+                else
+                    lenght += 8;
+                break;
+
+            case 2: //assoreq
+
+                lenght += 1;  //command id
+                if (secuLevel == 5)
+                    lenght += 16;   // 1 byte +4 byte e arriva a 16;
+                else if (secuLevel == 6)
+                    lenght += 16;     //1 byte +8 byte
+                else if (secuLevel == 7)
+                    lenght += 32;     //1 byte + 16 e si arrotonda a 32;
+                else
+                    lenght += 1;
+                break;
+
+            case 3: //assoresp
+
+                lenght += 1;  //command id
+                if (secuLevel == 5)
+                    lenght += 16;   // 3 byte +4 byte e arriva a 16;
+                else if (secuLevel == 6)
+                    lenght += 16;     //3 byte +8 byte
+                else if (secuLevel == 7)
+                    lenght += 32;     //3 byte + 16 e si arrotonda a 32;
+                else
+                    lenght += 3;
+                break;
+
+        }
+    }
     else
-        return lenghtPayload;
+    {
 
+        //qua non c'è la cifratura del payload ma comunque viene calcolata la lunghezza del payload in chiaro
+        switch (type)
+        {
+            case 0: //beacon
+
+                lenght += 6;  //mac payload senza beacon payload
+                lenght += 8;  //beacon payload
+                break;
+
+            case 1: //data
+
+                lenght += 8;  //data payload
+                break;
+
+            case 2: //assoreq
+
+                lenght += 1;  //command id
+                lenght += 1;  //content
+                break;
+
+            case 3: //assoresp
+
+                lenght += 1;  //command id
+                lenght += 3;   //content
+                break;
+
+        }
+    }
+    return lenght;
 }
 
 /***************************** DA QUI IN POI È ROBA LORO *******************************/
