@@ -1836,7 +1836,7 @@ void IEEE802154Mac::handleAck(cMessage* frame)
 
     if (mpib.getMacSecurityEnabled())
     {
-        secRecAck(ack->dup(),mpib.getSeculevel());
+        secRecAck(ack->dup(), mpib.getSeculevel());
 
     }
 
@@ -4571,10 +4571,13 @@ unsigned char IEEE802154Mac::calcFrameByteLength(cPacket* frame)
     macEV << "Calculating size of " << frame->getName() << endl;
     unsigned char byteLength;   // to calculate -> MHR + MAC payload + MFR (FCS)
     unsigned char MHRLength;    // to calculate MHR
+    bool secEn = par("SecurityEnabled").boolValue();
 
     if (dynamic_cast<AckFrame*>(frame))
     {
-        byteLength = SIZE_OF_802154_ACK;
+        int secLev = mpib.getSeculevel() % 4;
+        int mic = calcByteMicLenght(secEn, secLev);
+        byteLength = SIZE_OF_802154_ACK + mic;
     }
     else if (dynamic_cast<mpdu*>(frame))
     {
@@ -4583,7 +4586,6 @@ unsigned char IEEE802154Mac::calcFrameByteLength(cPacket* frame)
         frameType frmType = (frameType) ((frmFcf & ftMask) >> ftShift);
         MHRLength = calcMacHeaderByteLength(((frmFcf & damMask) >> damShift) + ((frmFcf & samMask) >> samShift), (bool) ((frmFcf && secuMask) >> secuShift));
         //macEV << "MAC Header size: " << (int) MHRLength << " Bytes | MAC Footer size: 2 Bytes \n";
-        bool secEn = par("SecurityEnabled").boolValue();
         //MANCA LA PARTE DI PAYLOAD QUANDO È SOLO AUTENTICATO
 
         if (frmType == Beacon)
@@ -4606,7 +4608,8 @@ unsigned char IEEE802154Mac::calcFrameByteLength(cPacket* frame)
         else if (frmType == Ack)
         {
             // 802.15.4-2006 Specs Fig 53: MHR (Frame Control + Sequence Number) + FCS (2)
-            int mic = calcByteMicLenght(secEn, mpduFrm->getAsh().secu.Seculevel%4);
+            int secLev = mpduFrm->getAsh().secu.Seculevel % 4;
+            int mic = calcByteMicLenght(secEn, secLev);
             byteLength = SIZE_OF_802154_ACK + mic;
         }
         else if (frmType == Command)
