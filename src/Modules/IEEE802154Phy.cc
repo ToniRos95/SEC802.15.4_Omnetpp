@@ -68,20 +68,22 @@ ppdu *IEEE802154Phy::generatePPDU(cMessage *psdu, bool ackFlag)
     cPacket *pk = dynamic_cast<cPacket *>(psdu);
     pdu->setSFD(229); // set SFD to 11100101 except for TODO ASK
 
-    if (ackFlag)
-    {
-        pdu->setPHR(5);     // for ACKs (802.15.4-2006 Figure 12)
-        pdu->encapsulate(pk);
-        pdu->setByteLength(5 + phyHeaderLength); // needed for calculation in Radio Module
-    }
-    else
-    {
-        pdu->setPHR(pk->getByteLength());
-        pdu->encapsulate(pk);
-        pdu->setByteLength(pk->getByteLength() + phyHeaderLength); // needed for calculation in Radio Module
-    }
+    /*
+     if (ackFlag)
+     {
+     pdu->setPHR(5);     // for ACKs (802.15.4-2006 Figure 12)
+     pdu->encapsulate(pk);
+     pdu->setByteLength(5 + phyHeaderLength); // needed for calculation in Radio Module
+     }
+     else
+     { */
+    pdu->setPHR(pk->getByteLength());
+    pdu->encapsulate(pk);
+    pdu->setByteLength(pk->getByteLength() + phyHeaderLength); // needed for calculation in Radio Module
+    //}
 
-    phyEV << "Frame length (PHR in PHY) = " << (unsigned short) pdu->getPHR() << " bytes | PPDU length (SHR + PHR + PSDU) = " << pdu->getByteLength() << " bytes) \n";
+    phyEV
+    << "Frame length (PHR in PHY) = " << (unsigned short) pdu->getPHR() << " bytes | PPDU length (SHR + PHR + PSDU) = " << pdu->getByteLength() << " bytes) \n";
 
     return pdu;
 }
@@ -139,7 +141,8 @@ void IEEE802154Phy::handleMessage(cMessage *msg)
             }
 
             case SET: {
-                phyEV << "PLME-SET.request received -> setting PhyPIB attribute and confirming with PLME-SET.confirm \n";
+                phyEV
+                << "PLME-SET.request received -> setting PhyPIB attribute and confirming with PLME-SET.confirm \n";
                 SetRequest* PhyPIBSet;
                 PhyPIBSet = check_and_cast<SetRequest *>(msg);
                 setPhyPIB(PhyPIBSet);
@@ -240,7 +243,8 @@ void IEEE802154Phy::handleMessage(cMessage *msg)
                 // XXX PHY should actually forward the pdDataIndication to the MAC, not decapsulate and only forward the PPDU
                 // LQI from pdDataIndication is needed for mscp.DataIndication
                 // in function: void IEEE802154Mac::sendMCPSDataIndication(mpdu* rxData)
-                phyEV << "is sending up the Payload of " << pdu->getName() << " which is a " << payload->getName() << endl;
+                phyEV
+                << "is sending up the Payload of " << pdu->getName() << " which is a " << payload->getName() << endl;
 
                 send(payload, "outPD");
                 delete (pdu);
