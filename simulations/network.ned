@@ -17,17 +17,22 @@ package ieee802154.simulations;
 
 import inet.world.radio.ChannelControl;
 import ieee802154.src.NED.IEEE802154Host;
+import ieee802154.src.NED.IEEE802154HostAttacker;
 
 network net
 {
     parameters:
         int numHosts;
+        int numAttackers;
 
     submodules:
         channelControl: ChannelControl {
             @display("p=75,20");
         }
         IEEE802154Nodes[numHosts]: IEEE802154Host {
+            @display("i=device/antennatower;p=100,100;i2=status/bulb,white");
+        }
+        IEEE802154NodesAttacker[numAttackers]: IEEE802154HostAttacker {
             @display("i=device/antennatower;p=100,100;i2=status/bulb,white");
         }
 

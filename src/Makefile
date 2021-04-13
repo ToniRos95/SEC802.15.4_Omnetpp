@@ -72,6 +72,7 @@ O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 OBJS = \
     $O/Modules/IEEE802154Mac.o \
     $O/Modules/msgBuffer.o \
+    $O/Modules/IEEE802154MacAttacker.o \
     $O/Modules/llc.o \
     $O/Modules/IEEE802154Radio.o \
     $O/Modules/sscs.o \
@@ -179,6 +180,25 @@ depend:
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 $O/Modules/IEEE802154Mac.o: Modules/IEEE802154Mac.cc \
 	Modules/IEEE802154Mac.h \
+	util/IEEE802154Consts.h \
+	util/IEEE802154Enum.h \
+	util/IEEE802154Fields.h \
+	util/MACAddressExt.h \
+	util/MICSec.h \
+	util/MPDU_m.h \
+	util/MacPIB.h \
+	util/PPDU_m.h \
+	util/mcpsData_m.h \
+	$(INET_PROJ)/src/base/Compat.h \
+	$(INET_PROJ)/src/base/INETDefs.h \
+	$(INET_PROJ)/src/base/INotifiable.h \
+	$(INET_PROJ)/src/base/ModuleAccess.h \
+	$(INET_PROJ)/src/base/NotificationBoard.h \
+	$(INET_PROJ)/src/base/NotifierConsts.h \
+	$(INET_PROJ)/src/linklayer/contract/PhyControlInfo_m.h \
+	$(INET_PROJ)/src/linklayer/contract/RadioState.h
+$O/Modules/IEEE802154MacAttacker.o: Modules/IEEE802154MacAttacker.cc \
+	Modules/IEEE802154MacAttacker.h \
 	util/IEEE802154Consts.h \
 	util/IEEE802154Enum.h \
 	util/IEEE802154Fields.h \
