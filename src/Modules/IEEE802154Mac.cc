@@ -84,6 +84,20 @@ void IEEE802154Mac::initialize(int stage)
         ////// SICUREZZAAAAAAAAAAAAAA
         mpib.setSeculevel(par("Seculevel"));
 
+        int ackOverhead = 6;
+        int secLev = mpib.getSeculevel();
+        bool secEnabled = par("SecurityEnabled");
+
+        if (secEnabled)
+        {
+            if (secLev == 1 || secLev == 5)
+                ackOverhead += 4;
+            else if (secLev == 2 || secLev == 6)
+                ackOverhead += 8;
+            else if (secLev == 3 || secLev == 7)
+                ackOverhead += 16;
+        }
+
         // initialize MacDSN (data sequence number) and MacBSN (beacon sequence number) to random 8-bit values
         //mpib.setMacDSN(intrand(255));
         mpib.setMacBSN(intrand(255));
@@ -98,7 +112,7 @@ void IEEE802154Mac::initialize(int stage)
 
         //mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + ppib.getSHR() + (6 - ppib.getSymbols()));
         ASSERT(getModuleByPath("^.^.PHY") != NULL);// getModuleByPath returns the PHY module here
-        mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + (getModuleByPath("^.^.PHY")->par("SHRDuration").longValue()) + (6 - (getModuleByPath("^.^.PHY")->par("symbolsPerOctet").longValue())));
+        mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + (getModuleByPath("^.^.PHY")->par("SHRDuration").longValue()) + (ackOverhead - (getModuleByPath("^.^.PHY")->par("symbolsPerOctet").longValue())));
 
         // inizialize PHY-related variables from PHY.ned -> FIXME -> PLME-GET msg should be used
         phy_channel = getModuleByPath("^.^.PHY")->par("currentChannel").longValue();
