@@ -20,6 +20,7 @@
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include <map>
 
 using namespace CryptoPP;
 using namespace std;
@@ -271,6 +272,10 @@ void IEEE802154Mac::initialize(int stage)
         gtsLength = 0;
         gtsStartSlot = 0;
         gtsTransDuration = 0;
+
+
+        //replayProtection
+        replayProtection = par("replayProtection");
 
         /**
          *  FIXME --> untested
@@ -795,7 +800,10 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                     {
 
                         Ash assoAsh;
+
+
                         assoAsh.FrameCount = 1;
+
                         assoAsh.KeyIdentifier.KeyIndex = frame->getKeyIndex();
                         assoAsh.KeyIdentifier.KeySource = frame->getKeySource();
                         assoAsh.secu.KeyIdMode = frame->getKeyIdMode();
@@ -8215,6 +8223,11 @@ int IEEE802154Mac::calcBytePayload(int type, bool securityEnable, int secuLevel)
         }
     }
     return lenght;
+}
+
+
+int IEEE802154Mac::calcSecFrameCounter(){
+    return 0;
 }
 
 /***************************** DA QUI IN POI È ROBA LORO *******************************/

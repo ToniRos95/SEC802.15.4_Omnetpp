@@ -327,6 +327,7 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         std::vector<std::string> parserSecMessage(std::string str, char ch);
         int calcByteMicLenght(bool securityEnable, int secuLevel);
         int calcBytePayload(int type, bool securityEnable, int secuLevel);
+        int calcSecFrameCounter();
 
     private:
 
@@ -340,10 +341,13 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         bool trxState;
         unsigned int headerSize;
         cMessage* selfMsg;
+        bool replayProtection;
 
         // Message Types
         std::map<std::string, PIBMsgTypes> mappedMsgTypes;
         std::map<std::string, mlmeRequestTypes> mappedMlmeRequestTypes;
+        std::map<std::string, unsigned int> secFrameCounter;
+
 
         // Variables used for channel scanning
         ScanType scanType; // see IEEE802154Enum.h

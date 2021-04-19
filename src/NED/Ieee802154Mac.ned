@@ -41,6 +41,7 @@ simple IEEE802154Mac
         bool isFFD = default(true);             	// full function devices yes/no
         
       	int Seculevel;
+      	bool replayProtection;
 
     gates:
         // LLC interface
