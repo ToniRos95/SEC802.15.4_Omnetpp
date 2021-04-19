@@ -473,7 +473,7 @@ inline void doUnpacking(cCommBuffer *b, AssoCmdresp& obj) {obj.parsimUnpack(b);}
  *     unsigned short fcs;     // 16-Bit Frame Check Sequence
  *     unsigned char sqnr;     // 8-Bit Sequence Number
  *     unsigned short fcf;     // 16-Bit Framce Control Field
- *     string mic;
+ *     string Mic;
  * }
  * </pre>
  */
@@ -483,7 +483,7 @@ class AckFrame : public ::cPacket
     unsigned short fcs_var;
     unsigned char sqnr_var;
     unsigned short fcf_var;
-    opp_string mic_var;
+    opp_string Mic_var;
 
   private:
     void copy(const AckFrame& other);
@@ -509,7 +509,7 @@ class AckFrame : public ::cPacket
     virtual unsigned short getFcf() const;
     virtual void setFcf(unsigned short fcf);
     virtual const char * getMic() const;
-    virtual void setMic(const char * mic);
+    virtual void setMic(const char * Mic);
 };
 
 inline void doPacking(cCommBuffer *b, AckFrame& obj) {obj.parsimPack(b);}

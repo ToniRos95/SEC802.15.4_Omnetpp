@@ -2,7 +2,7 @@
 # OMNeT++/OMNEST Makefile for IEEE802154INET-Standalone
 #
 # This file was generated with the command:
-#  opp_makemake -f --deep -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/transport/tcp_common -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/base -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/util -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/linklayer/ieee80211/mac -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/transport/udp -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/linklayer/ieee80211/radio/errormodel -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/util/headerserializers -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/linklayer/ieee80211/radio -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/status -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/transport/sctp -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/networklayer/icmpv6 -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/linklayer/radio/propagation -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/transport/contract -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/networklayer/ipv6tunneling -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/world/radio -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/linklayer/contract -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/util/headerserializers/udp -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/util/headerserializers/tcp -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/linklayer/radio -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/world/obstacles -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/networklayer/common -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/networklayer/ipv6 -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/networklayer/arp -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/networklayer/routing/aodv -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/networklayer/contract -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/networklayer/xmipv6 -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/util/headerserializers/sctp -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/util/headerserializers/ipv6 -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/battery/models -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/networklayer/autorouting/ipv4 -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/networklayer/ipv4 -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/mobility/contract -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/applications/pingapp -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/linklayer/common -I/home/lollo/Desktop/omnetpp-4.6/samples/inet/src/util/headerserializers/ipv4 -L/home/lollo/Desktop/omnetpp-4.6/samples/inet/out/$$\(CONFIGNAME\)/src -lcryptopp -linet -DINET_IMPORT -KINET_PROJ=/home/lollo/Desktop/omnetpp-4.6/samples/inet
+#  opp_makemake -f --deep -I../../inet/src/transport/tcp_common -I../../inet/src/base -I../../inet/src/util -I../../inet/src/linklayer/ieee80211/mac -I../../inet/src/transport/udp -I../../inet/src/linklayer/ieee80211/radio/errormodel -I../../inet/src/util/headerserializers -I../../inet/src/linklayer/ieee80211/radio -I../../inet/src/status -I../../inet/src/transport/sctp -I../../inet/src/networklayer/icmpv6 -I../../inet/src/linklayer/radio/propagation -I../../inet/src/transport/contract -I../../inet/src/networklayer/ipv6tunneling -I../../inet/src/world/radio -I../../inet/src/linklayer/contract -I../../inet/src/util/headerserializers/udp -I../../inet/src/util/headerserializers/tcp -I../../inet/src/linklayer/radio -I../../inet/src/world/obstacles -I../../inet/src/networklayer/common -I../../inet/src/networklayer/ipv6 -I../../inet/src/networklayer/arp -I../../inet/src/networklayer/routing/aodv -I../../inet/src/networklayer/contract -I../../inet/src -I../../inet/src/networklayer/xmipv6 -I../../inet/src/util/headerserializers/sctp -I../../inet/src/util/headerserializers/ipv6 -I../../inet/src/battery/models -I../../inet/src/networklayer/autorouting/ipv4 -I../../inet/src/networklayer/ipv4 -I../../inet/src/mobility/contract -I../../inet/src/applications/pingapp -I../../inet/src/linklayer/common -I../../inet/src/util/headerserializers/ipv4 -L../../inet/out/$$\(CONFIGNAME\)/src -lcryptopp -linet -DINET_IMPORT -KINET_PROJ=../../inet
 #
 
 # Name of target to be created (-o option)
@@ -15,42 +15,42 @@ USERIF_LIBS = $(ALL_ENV_LIBS) # that is, $(TKENV_LIBS) $(CMDENV_LIBS)
 
 # C++ include paths (with -I)
 INCLUDE_PATH = \
-    -I$(INET_PROJ)/src/transport/tcp_common \
-    -I$(INET_PROJ)/src/base \
-    -I$(INET_PROJ)/src/util \
-    -I$(INET_PROJ)/src/linklayer/ieee80211/mac \
-    -I$(INET_PROJ)/src/transport/udp \
-    -I$(INET_PROJ)/src/linklayer/ieee80211/radio/errormodel \
-    -I$(INET_PROJ)/src/util/headerserializers \
-    -I$(INET_PROJ)/src/linklayer/ieee80211/radio \
-    -I$(INET_PROJ)/src/status \
-    -I$(INET_PROJ)/src/transport/sctp \
-    -I$(INET_PROJ)/src/networklayer/icmpv6 \
-    -I$(INET_PROJ)/src/linklayer/radio/propagation \
-    -I$(INET_PROJ)/src/transport/contract \
-    -I$(INET_PROJ)/src/networklayer/ipv6tunneling \
-    -I$(INET_PROJ)/src/world/radio \
-    -I$(INET_PROJ)/src/linklayer/contract \
-    -I$(INET_PROJ)/src/util/headerserializers/udp \
-    -I$(INET_PROJ)/src/util/headerserializers/tcp \
-    -I$(INET_PROJ)/src/linklayer/radio \
-    -I$(INET_PROJ)/src/world/obstacles \
-    -I$(INET_PROJ)/src/networklayer/common \
-    -I$(INET_PROJ)/src/networklayer/ipv6 \
-    -I$(INET_PROJ)/src/networklayer/arp \
-    -I$(INET_PROJ)/src/networklayer/routing/aodv \
-    -I$(INET_PROJ)/src/networklayer/contract \
-    -I$(INET_PROJ)/src \
-    -I$(INET_PROJ)/src/networklayer/xmipv6 \
-    -I$(INET_PROJ)/src/util/headerserializers/sctp \
-    -I$(INET_PROJ)/src/util/headerserializers/ipv6 \
-    -I$(INET_PROJ)/src/battery/models \
-    -I$(INET_PROJ)/src/networklayer/autorouting/ipv4 \
-    -I$(INET_PROJ)/src/networklayer/ipv4 \
-    -I$(INET_PROJ)/src/mobility/contract \
-    -I$(INET_PROJ)/src/applications/pingapp \
-    -I$(INET_PROJ)/src/linklayer/common \
-    -I$(INET_PROJ)/src/util/headerserializers/ipv4 \
+    -I../../inet/src/transport/tcp_common \
+    -I../../inet/src/base \
+    -I../../inet/src/util \
+    -I../../inet/src/linklayer/ieee80211/mac \
+    -I../../inet/src/transport/udp \
+    -I../../inet/src/linklayer/ieee80211/radio/errormodel \
+    -I../../inet/src/util/headerserializers \
+    -I../../inet/src/linklayer/ieee80211/radio \
+    -I../../inet/src/status \
+    -I../../inet/src/transport/sctp \
+    -I../../inet/src/networklayer/icmpv6 \
+    -I../../inet/src/linklayer/radio/propagation \
+    -I../../inet/src/transport/contract \
+    -I../../inet/src/networklayer/ipv6tunneling \
+    -I../../inet/src/world/radio \
+    -I../../inet/src/linklayer/contract \
+    -I../../inet/src/util/headerserializers/udp \
+    -I../../inet/src/util/headerserializers/tcp \
+    -I../../inet/src/linklayer/radio \
+    -I../../inet/src/world/obstacles \
+    -I../../inet/src/networklayer/common \
+    -I../../inet/src/networklayer/ipv6 \
+    -I../../inet/src/networklayer/arp \
+    -I../../inet/src/networklayer/routing/aodv \
+    -I../../inet/src/networklayer/contract \
+    -I../../inet/src \
+    -I../../inet/src/networklayer/xmipv6 \
+    -I../../inet/src/util/headerserializers/sctp \
+    -I../../inet/src/util/headerserializers/ipv6 \
+    -I../../inet/src/battery/models \
+    -I../../inet/src/networklayer/autorouting/ipv4 \
+    -I../../inet/src/networklayer/ipv4 \
+    -I../../inet/src/mobility/contract \
+    -I../../inet/src/applications/pingapp \
+    -I../../inet/src/linklayer/common \
+    -I../../inet/src/util/headerserializers/ipv4 \
     -I. \
     -IModules \
     -INED \
@@ -60,8 +60,8 @@ INCLUDE_PATH = \
 EXTRA_OBJS =
 
 # Additional libraries (-L, -l options)
-LIBS = -L$(INET_PROJ)/out/$(CONFIGNAME)/src  -lcryptopp -linet
-LIBS += -Wl,-rpath,`abspath $(INET_PROJ)/out/$(CONFIGNAME)/src`
+LIBS = -L../../inet/out/$(CONFIGNAME)/src  -lcryptopp -linet
+LIBS += -Wl,-rpath,`abspath ../../inet/out/$(CONFIGNAME)/src`
 
 # Output directory
 PROJECT_OUTPUT_DIR = ../out
@@ -70,17 +70,17 @@ O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
 # Object files for local .cc and .msg files
 OBJS = \
+    $O/Modules/sscs.o \
+    $O/Modules/IEEE802154MacAttacker.o \
+    $O/Modules/IEEE802154Phy.o \
+    $O/Modules/IEEE802154Radio.o \
+    $O/Modules/llc.o \
     $O/Modules/IEEE802154Mac.o \
     $O/Modules/msgBuffer.o \
-    $O/Modules/IEEE802154MacAttacker.o \
-    $O/Modules/llc.o \
-    $O/Modules/IEEE802154Radio.o \
-    $O/Modules/sscs.o \
-    $O/Modules/IEEE802154Phy.o \
     $O/util/MICSec.o \
     $O/util/PhyPIB.o \
-    $O/util/MacPIB.o \
     $O/util/MACAddressExt.o \
+    $O/util/MacPIB.o \
     $O/util/PPDU_m.o \
     $O/util/MPDU_m.o \
     $O/util/mcpsData_m.o
@@ -92,7 +92,7 @@ MSGFILES = \
     util/mcpsData.msg
 
 # Other makefile variables (-K)
-INET_PROJ=/home/lollo/Desktop/omnetpp-4.6/samples/inet
+INET_PROJ=../../inet
 
 #------------------------------------------------------------------------------
 
@@ -195,6 +195,8 @@ $O/Modules/IEEE802154Mac.o: Modules/IEEE802154Mac.cc \
 	$(INET_PROJ)/src/base/ModuleAccess.h \
 	$(INET_PROJ)/src/base/NotificationBoard.h \
 	$(INET_PROJ)/src/base/NotifierConsts.h \
+	$(INET_PROJ)/src/battery/models/BasicBattery.h \
+	$(INET_PROJ)/src/battery/models/InetSimpleBattery.h \
 	$(INET_PROJ)/src/linklayer/contract/PhyControlInfo_m.h \
 	$(INET_PROJ)/src/linklayer/contract/RadioState.h
 $O/Modules/IEEE802154MacAttacker.o: Modules/IEEE802154MacAttacker.cc \

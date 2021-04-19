@@ -11,6 +11,8 @@
 #include "cryptopp/hex.h"
 #include "cryptopp/modes.h"
 #include "cryptopp/filters.h"
+#include "BasicBattery.h"
+#include "InetSimpleBattery.h"
 
 #include <iostream>
 #include <iomanip>
@@ -84,6 +86,20 @@ void IEEE802154Mac::initialize(int stage)
         ////// SICUREZZAAAAAAAAAAAAAA
         mpib.setSeculevel(par("Seculevel"));
 
+        int ackOverhead = 6;
+        int secLev = mpib.getSeculevel();
+        bool secEnabled = par("SecurityEnabled");
+
+        if (secEnabled)
+        {
+            if (secLev == 1 || secLev == 5)
+                ackOverhead += 4;
+            else if (secLev == 2 || secLev == 6)
+                ackOverhead += 8;
+            else if (secLev == 3 || secLev == 7)
+                ackOverhead += 16;
+        }
+
         // initialize MacDSN (data sequence number) and MacBSN (beacon sequence number) to random 8-bit values
         //mpib.setMacDSN(intrand(255));
         mpib.setMacBSN(intrand(255));
@@ -98,8 +114,7 @@ void IEEE802154Mac::initialize(int stage)
 
         //mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + ppib.getSHR() + (6 - ppib.getSymbols()));
         ASSERT(getModuleByPath("^.^.PHY") != NULL);// getModuleByPath returns the PHY module here
-        mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + (getModuleByPath("^.^.PHY")->par("SHRDuration").longValue()) + (6 - (getModuleByPath("^.^.PHY")->par("symbolsPerOctet").longValue())));
-
+        mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + (getModuleByPath("^.^.PHY")->par("SHRDuration").longValue()) + (ackOverhead - (getModuleByPath("^.^.PHY")->par("symbolsPerOctet").longValue())));
         // inizialize PHY-related variables from PHY.ned -> FIXME -> PLME-GET msg should be used
         phy_channel = getModuleByPath("^.^.PHY")->par("currentChannel").longValue();
         ASSERT(phy_channel <= 26); // check if parameter set in NED file is within boundaries
@@ -288,6 +303,8 @@ void IEEE802154Mac::initialize(int stage)
     else if (stage == 1)
     {
         macEV << "Initializing Stage 1 \n";
+
+        idBattery = registerBattery();
 
         WATCH(bPeriod);
         WATCH(inTxSD_txSDTimer);
@@ -670,6 +687,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
             assoAsh.secu.Seculevel = mpib.getSeculevel();
             data->setAsh(assoAsh);
 
+            typePacket = 0;
+
             if (assoAsh.secu.Seculevel == 1 || assoAsh.secu.Seculevel == 2 || assoAsh.secu.Seculevel == 3)
             {
                 data->setMic(secPacket(data->dup()).c_str());
@@ -682,6 +701,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                 data->getEncapsulatedPacket()->setName("");
 
             }
+
+            drawBattery(IEEE802154Mac::DATA_TEMP);
 
         }
 
@@ -791,6 +812,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
 
                         AssoCommand->setAsh(assoAsh);
 
+                        typePacket = 1;
+
                         if (assoAsh.secu.Seculevel == 1 || assoAsh.secu.Seculevel == 2 || assoAsh.secu.Seculevel == 3)
                         {
                             AssoCommand->setMic(secPacket(AssoCommand->dup()).c_str());
@@ -805,6 +828,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                             AssoCommand->setCapabilityInformation(empty);
 
                         }
+
+                        drawBattery(IEEE802154Mac::ASSOREQ_TEMP);
 
                     }
                     /**
@@ -1731,7 +1756,7 @@ void IEEE802154Mac::handleBeacon(mpdu *frame)
 
             //std::cout << "RXSFSPEC  " << endl;
             //std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
-
+            drawBattery(IEEE802154Mac::BEACON_TEMP);
         }
         else
         {
@@ -1837,6 +1862,7 @@ void IEEE802154Mac::handleAck(cMessage* frame)
     if (mpib.getMacSecurityEnabled())
     {
         secRecAck(ack->dup(), mpib.getSeculevel());
+        drawBattery(IEEE802154Mac::ACK_TEMP);
 
     }
 
@@ -1929,7 +1955,7 @@ void IEEE802154Mac::handleData(mpdu* frame)
 
         //std::cout << "RXSFSPEC  " << endl;
         //std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
-
+        drawBattery(IEEE802154Mac::DATA_TEMP);
     }
 
     rxData = (frame->dup());
@@ -1957,7 +1983,7 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
 
                 if (mpib.getMacSecurityEnabled())
                 {
-
+                    typePacketRec = 1;
                     /**
                      std::cout << " TESTO DECIFRATO IN HEX" << endl;
                      printHex(encoded);
@@ -1997,6 +2023,7 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                         assoInd->setCapabilityInformation(tempDevCap);
 
                     }
+                    drawBattery(IEEE802154Mac::ASSOREQ_TEMP);
 
                 }
                 else
@@ -2049,6 +2076,7 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
 
                 if (mpib.getMacSecurityEnabled())
                 {
+                    typePacketRec = 2;
 
                     if (aresp->getAsh().secu.Seculevel == 1 || aresp->getAsh().secu.Seculevel == 2 || aresp->getAsh().secu.Seculevel == 3)
                     {
@@ -2072,6 +2100,7 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                         aresp->setStatus(status);
 
                     }
+                    drawBattery(IEEE802154Mac::ASSORESP_TEMP);
 
                 }
 
@@ -2294,13 +2323,25 @@ void IEEE802154Mac::handle_PLME_SET_TRX_STATE_confirm(phyState status)
         else if ((rxData != NULL)) // beacon enabled PAN - processing DATA frame
         {
             // here we use the hidden destination address that we already set in ACK on purpose
-            delay = csmacaLocateBoundary((rxData->getSrc().getShortAddr() == mpib.getMacCoordShortAddress()), 0.0);
+            delay = csmacaLocateBoundary((rxData->getSrc().getShortAddr() == mpib.getMacCoordShortAddress()), 0.0) + dataTemp;
             ASSERT(delay < bPeriod);
         }
         else if ((rxCmd != NULL)) // beacon enabled PAN - processing CMD frame
         {
             // here we use the hidden destination address that we already set in ACK on purpose
-            delay = csmacaLocateBoundary((rxCmd->getSrc().getShortAddr() == mpib.getMacCoordShortAddress()), 0.0);
+            if (typePacketRec == 1)
+            {
+
+                delay = csmacaLocateBoundary((rxCmd->getSrc().getShortAddr() == mpib.getMacCoordShortAddress()), 0.0) + assoreqTemp;
+
+            }
+            else
+            {
+
+                delay = csmacaLocateBoundary((rxCmd->getSrc().getShortAddr() == mpib.getMacCoordShortAddress()), 0.0) + assorespTemp;
+
+            }
+
             ASSERT(delay < bPeriod);
         }
 
@@ -2857,7 +2898,9 @@ void IEEE802154Mac::genACK(unsigned char dsn, bool fp)
     ack->setFcs(0);
     if (mpib.getMacSecurityEnabled())
     {
+        //string prova= secAck(ack->dup(), mpib.getSeculevel()).c_str();
         ack->setMic(secAck(ack->dup(), mpib.getSeculevel()).c_str());
+        drawBattery(IEEE802154Mac::ACK_TEMP);
     }
     ack->setByteLength(calcFrameByteLength(ack));
     ASSERT(!txAck); // It's impossible to receive the second packet before the ACK has been sent out!
@@ -2902,6 +2945,7 @@ void IEEE802154Mac::genAssoResp(MlmeAssociationStatus status, AssoCmdreq* tmpAss
 
         assoResp->setAsh(assoAsh);
 
+        typePacket = 2;
         if (assoAsh.secu.Seculevel == 1 || assoAsh.secu.Seculevel == 2 || assoAsh.secu.Seculevel == 3)
         {
             assoResp->setMic(secPacket(assoResp->dup()).c_str());
@@ -2915,6 +2959,7 @@ void IEEE802154Mac::genAssoResp(MlmeAssociationStatus status, AssoCmdreq* tmpAss
             assoResp->setShortAddress(65535); // 16bit short address, value of 0xffff (65.535) indicates that the device does not have a short address
 
         }
+        drawBattery(IEEE802154Mac::ASSORESP_TEMP);
 
     }
 
@@ -3184,7 +3229,18 @@ void IEEE802154Mac::genBeaconInd(mpdu* frame)
         bNotify->setSduLength(bFrame->getEncapsulatedPacket()->getByteLength());
         bNotify->encapsulate(bFrame->decapsulate());
     }
-    send(bNotify, "outMLME");
+
+    if (mpib.getMacSecurityEnabled())
+    {
+
+        sendDelayed(bNotify, beaconTemp, "outMLME");
+
+    }
+    else
+    {
+        send(bNotify, "outMLME");  // send a duplication
+    }
+
 }
 
 void IEEE802154Mac::genGTSConf(GTSDescriptor gts, MACenum status)
@@ -4493,7 +4549,7 @@ void IEEE802154Mac::startTxAckBoundTimer(simtime_t wtime)
     {
         cancelEvent(txAckBoundTimer);
     }
-    scheduleAt(simTime() + wtime, txAckBoundTimer);
+    scheduleAt(simTime() + wtime + ackTemp, txAckBoundTimer);
 }
 
 void IEEE802154Mac::startTxCmdDataBoundTimer(simtime_t wtime)
@@ -4502,7 +4558,30 @@ void IEEE802154Mac::startTxCmdDataBoundTimer(simtime_t wtime)
     {
         cancelEvent(txCmdDataBoundTimer);
     }
-    scheduleAt(simTime() + wtime, txCmdDataBoundTimer);
+    if (mpib.getMacSecurityEnabled())
+    {
+
+        switch (typePacket)
+        {
+
+            case 0:
+                scheduleAt(simTime() + wtime + dataTemp, txCmdDataBoundTimer);
+                break;
+            case 1:
+                scheduleAt(simTime() + wtime + assoreqTemp, txCmdDataBoundTimer);
+                break;
+            case 2:
+                scheduleAt(simTime() + wtime + assorespTemp, txCmdDataBoundTimer);
+                break;
+
+        }
+
+    }
+    else
+    {
+        scheduleAt(simTime() + wtime, txCmdDataBoundTimer);
+    }
+
 }
 
 void IEEE802154Mac::startIfsTimer(IFSType ifsType)
@@ -4982,6 +5061,8 @@ void IEEE802154Mac::handleBcnTxTimer()
 
                 }
 
+                drawBattery(IEEE802154Mac::BEACON_TEMP);
+
             }
 
             //FIXARE LA PARTE DI SOPRA!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -5256,7 +5337,18 @@ void IEEE802154Mac::handleBcnTxTimer()
             txPkt = tmpBcn;
             mpib.setMacBeaconTxTime(simTime());  // no delay
             inTransmission = true;  // cleared by PD_DATA_confirm
-            send(txBeacon->dup(), "outPD");  // send a duplication
+            if (mpib.getMacSecurityEnabled())
+            {
+
+                sendDelayed(txBeacon->dup(), beaconTemp, "outPD");  // send a duplication
+                //send(txBeacon->dup(), "outPD");  // send a duplication
+
+            }
+            else
+            {
+                send(txBeacon->dup(), "outPD");  // send a duplication
+            }
+
             macEV
             << "Sending frame " << txBeacon->getName() << " (" << txBeacon->getByteLength() << " Bytes) to PHY layer \n";
             macEV << "The estimated transmission time is " << calcDuration(txBeacon) << " sec \n";
@@ -8063,7 +8155,7 @@ int IEEE802154Mac::calcByteMicLenght(bool securityEnable, int secuLevel)
         case 2:
             return 8;
         case 3:
-            return 16;
+            return 16; //////////////////////////////////////////////////////////////////////////////////////////////////////////////VERIFICAAAAREEEEE
         default:
             return 0;
     }
@@ -8203,7 +8295,76 @@ int IEEE802154Mac::calcBytePayload(int type, bool securityEnable, int secuLevel)
     return lenght;
 }
 
-/***************************** DA QUI IN POI È ROBA LORO *******************************/
+int IEEE802154Mac::registerBattery()
+{
+    BasicBattery *bat = BatteryAccess().getIfExists();
+    if (bat)
+    {
+        AckCurrent = par("AckCurrent");
+        PacketCurrent = par("PacketCurrent");
+        beaconTemp = par("beaconTemp");
+        dataTemp = par("dataTemp");
+        ackTemp = par("ackTemp");
+        assoreqTemp = par("assoreqTemp");
+        assorespTemp = par("assorespTemp");
+        idHost = par("idHost");
+        // read parameters
+        // double mUsageIEEE802154RadioIdle = par("usage_IEEE802154Radio_idle");
+        //double mUsageIEEE802154RadioRecv = par("usage_IEEE802154Radio_recv");
+        // double mUsageIEEE802154RadioSleep = par("usage_IEEE802154Radio_sleep");
+        // double mUsageIEEE802154RadioSend = par("usage_IEEE802154Radio_send");
+        // if ((mUsageIEEE802154RadioIdle < 0) || (mUsageIEEE802154RadioRecv < 0) || (mUsageIEEE802154RadioSleep < 0) || (mUsageIEEE802154RadioSend < 0))
+        //{
+        //     return;
+        // }
+        bat->setIdHost(idHost);
+        return bat->registerDevice(this, 5);
+    }
+    return -1;
+}
+
+void IEEE802154Mac::drawBattery(int activity)
+{
+
+    BasicBattery *bat = BatteryAccess().getIfExists();
+    if (bat)
+    {
+        DrawAmount currentDraw;
+        switch (activity)
+        {
+            case IEEE802154Mac::BEACON_TEMP:
+                currentDraw =
+                {   DrawAmount::CURRENT, PacketCurrent};
+                bat->drawMAC(idBattery, currentDraw, IEEE802154Mac::BEACON_TEMP, beaconTemp);
+                break;
+                case IEEE802154Mac::ACK_TEMP:
+                currentDraw =
+                {   DrawAmount::CURRENT, AckCurrent};
+                bat->drawMAC(idBattery, currentDraw, IEEE802154Mac::ACK_TEMP, ackTemp);
+                break;
+                case IEEE802154Mac::DATA_TEMP:
+                currentDraw =
+                {   DrawAmount::CURRENT, PacketCurrent};
+                bat->drawMAC(idBattery, currentDraw, IEEE802154Mac::DATA_TEMP, dataTemp);
+                break;
+                case IEEE802154Mac::ASSORESP_TEMP:
+                currentDraw =
+                {   DrawAmount::CURRENT, PacketCurrent};
+                bat->drawMAC(idBattery, currentDraw, IEEE802154Mac::ASSORESP_TEMP, assorespTemp);
+                break;
+                case IEEE802154Mac::ASSOREQ_TEMP:
+                currentDraw =
+                {   DrawAmount::CURRENT, PacketCurrent};
+                bat->drawMAC(idBattery, currentDraw, IEEE802154Mac::ASSOREQ_TEMP, assoreqTemp);
+                break;
+
+            }
+
+        }
+
+    }
+
+    /***************************** DA QUI IN POI È ROBA LORO *******************************/
 
 void IEEE802154Mac::finish()
 {

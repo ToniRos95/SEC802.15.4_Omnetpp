@@ -150,6 +150,10 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         /** @brief Counter to go through device list for setting up destination address since we have no real application */
         int counter;
 
+        enum State{
+            BEACON_TEMP, ACK_TEMP, DATA_TEMP, ASSORESP_TEMP, ASSOREQ_TEMP
+        };
+
     protected:
         /** @brief Debug output switch for the IEEE 802.15.4 MAC module */
         bool macDebug = false;
@@ -328,7 +332,24 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         int calcByteMicLenght(bool securityEnable, int secuLevel);
         int calcBytePayload(int type, bool securityEnable, int secuLevel);
 
+        ///BATTERIA
+        int  registerBattery();
+        void drawBattery(int activity);
     private:
+
+        //Questa variabile serve a settare i tempi da sommare per la cifratura dei pacchetti. 0=data 1= assoreq 2= assoresp
+        int typePacket;
+        int typePacketRec;
+
+        int idBattery;
+        int idHost;
+        double AckCurrent;
+        double PacketCurrent;
+        double beaconTemp;
+        double dataTemp;
+        double ackTemp;
+        double assorespTemp;
+        double assoreqTemp;
 
         NotificationBoard *nb;
         // MAC PAN Information Base

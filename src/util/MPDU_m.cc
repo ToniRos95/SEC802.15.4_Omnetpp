@@ -2613,7 +2613,7 @@ AckFrame::AckFrame(const char *name, int kind) : ::cPacket(name,kind)
     this->fcs_var = 0;
     this->sqnr_var = 0;
     this->fcf_var = 0;
-    this->mic_var = 0;
+    this->Mic_var = 0;
 }
 
 AckFrame::AckFrame(const AckFrame& other) : ::cPacket(other)
@@ -2638,7 +2638,7 @@ void AckFrame::copy(const AckFrame& other)
     this->fcs_var = other.fcs_var;
     this->sqnr_var = other.sqnr_var;
     this->fcf_var = other.fcf_var;
-    this->mic_var = other.mic_var;
+    this->Mic_var = other.Mic_var;
 }
 
 void AckFrame::parsimPack(cCommBuffer *b)
@@ -2647,7 +2647,7 @@ void AckFrame::parsimPack(cCommBuffer *b)
     doPacking(b,this->fcs_var);
     doPacking(b,this->sqnr_var);
     doPacking(b,this->fcf_var);
-    doPacking(b,this->mic_var);
+    doPacking(b,this->Mic_var);
 }
 
 void AckFrame::parsimUnpack(cCommBuffer *b)
@@ -2656,7 +2656,7 @@ void AckFrame::parsimUnpack(cCommBuffer *b)
     doUnpacking(b,this->fcs_var);
     doUnpacking(b,this->sqnr_var);
     doUnpacking(b,this->fcf_var);
-    doUnpacking(b,this->mic_var);
+    doUnpacking(b,this->Mic_var);
 }
 
 unsigned short AckFrame::getFcs() const
@@ -2691,12 +2691,12 @@ void AckFrame::setFcf(unsigned short fcf)
 
 const char * AckFrame::getMic() const
 {
-    return mic_var.c_str();
+    return Mic_var.c_str();
 }
 
-void AckFrame::setMic(const char * mic)
+void AckFrame::setMic(const char * Mic)
 {
-    this->mic_var = mic;
+    this->Mic_var = Mic;
 }
 
 class AckFrameDescriptor : public cClassDescriptor
@@ -2778,7 +2778,7 @@ const char *AckFrameDescriptor::getFieldName(void *object, int field) const
         "fcs",
         "sqnr",
         "fcf",
-        "mic",
+        "Mic",
     };
     return (field>=0 && field<4) ? fieldNames[field] : NULL;
 }
@@ -2790,7 +2790,7 @@ int AckFrameDescriptor::findField(void *object, const char *fieldName) const
     if (fieldName[0]=='f' && strcmp(fieldName, "fcs")==0) return base+0;
     if (fieldName[0]=='s' && strcmp(fieldName, "sqnr")==0) return base+1;
     if (fieldName[0]=='f' && strcmp(fieldName, "fcf")==0) return base+2;
-    if (fieldName[0]=='m' && strcmp(fieldName, "mic")==0) return base+3;
+    if (fieldName[0]=='M' && strcmp(fieldName, "Mic")==0) return base+3;
     return basedesc ? basedesc->findField(object, fieldName) : -1;
 }
 

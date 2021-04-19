@@ -41,6 +41,15 @@ simple IEEE802154Mac
         bool isFFD = default(true);             	// full function devices yes/no
         
       	int Seculevel;
+      	double AckCurrent;
+      	double PacketCurrent;
+      	double beaconTemp;
+      	double dataTemp;
+      	double ackTemp;
+      	double assorespTemp;
+      	double assoreqTemp;
+      	
+      	int idHost;
 
     gates:
         // LLC interface
