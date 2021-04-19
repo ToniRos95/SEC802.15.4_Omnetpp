@@ -22,6 +22,7 @@
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include <map>
 
 using namespace CryptoPP;
 using namespace std;
@@ -115,6 +116,7 @@ void IEEE802154Mac::initialize(int stage)
         //mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + ppib.getSHR() + (6 - ppib.getSymbols()));
         ASSERT(getModuleByPath("^.^.PHY") != NULL);// getModuleByPath returns the PHY module here
         mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + (getModuleByPath("^.^.PHY")->par("SHRDuration").longValue()) + (ackOverhead - (getModuleByPath("^.^.PHY")->par("symbolsPerOctet").longValue())));
+
         // inizialize PHY-related variables from PHY.ned -> FIXME -> PLME-GET msg should be used
         phy_channel = getModuleByPath("^.^.PHY")->par("currentChannel").longValue();
         ASSERT(phy_channel <= 26); // check if parameter set in NED file is within boundaries
@@ -272,6 +274,10 @@ void IEEE802154Mac::initialize(int stage)
         gtsLength = 0;
         gtsStartSlot = 0;
         gtsTransDuration = 0;
+
+
+        //replayProtection
+        replayProtection = par("replayProtection");
 
         /**
          *  FIXME --> untested
@@ -802,7 +808,10 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
                     {
 
                         Ash assoAsh;
+
+
                         assoAsh.FrameCount = 1;
+
                         assoAsh.KeyIdentifier.KeyIndex = frame->getKeyIndex();
                         assoAsh.KeyIdentifier.KeySource = frame->getKeySource();
                         assoAsh.secu.KeyIdMode = frame->getKeyIdMode();
@@ -5340,6 +5349,7 @@ void IEEE802154Mac::handleBcnTxTimer()
             if (mpib.getMacSecurityEnabled())
             {
 
+                std::cout << "WEEEEEEEEEEEEEEEEEEEEEE "<< beaconTemp << endl;
                 sendDelayed(txBeacon->dup(), beaconTemp, "outPD");  // send a duplication
                 //send(txBeacon->dup(), "outPD");  // send a duplication
 
@@ -8295,6 +8305,7 @@ int IEEE802154Mac::calcBytePayload(int type, bool securityEnable, int secuLevel)
     return lenght;
 }
 
+
 int IEEE802154Mac::registerBattery()
 {
     BasicBattery *bat = BatteryAccess().getIfExists();
@@ -8364,7 +8375,12 @@ void IEEE802154Mac::drawBattery(int activity)
 
     }
 
-    /***************************** DA QUI IN POI È ROBA LORO *******************************/
+
+int IEEE802154Mac::calcSecFrameCounter(){
+    return 0;
+}
+
+/***************************** DA QUI IN POI È ROBA LORO *******************************/
 
 void IEEE802154Mac::finish()
 {

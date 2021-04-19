@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>IEEE802154INET-Standalone</name>
+	<name>SecIEEE802154INET-Standalone</name>
 	<comment></comment>
 	<projects>
 		<project>inet</project>

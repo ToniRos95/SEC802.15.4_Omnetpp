@@ -50,6 +50,7 @@ simple IEEE802154Mac
       	double assoreqTemp;
       	
       	int idHost;
+      	bool replayProtection;
 
     gates:
         // LLC interface
