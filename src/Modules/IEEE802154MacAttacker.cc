@@ -11,7 +11,10 @@
 #include "cryptopp/hex.h"
 #include "cryptopp/modes.h"
 #include "cryptopp/filters.h"
+#include "BasicBattery.h"
+#include "InetSimpleBattery.h"
 
+#include <iostream>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -19,6 +22,7 @@
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include <map>
 
 using namespace CryptoPP;
 using namespace std;
@@ -83,6 +87,20 @@ void IEEE802154MacAttacker::initialize(int stage)
         ////// SICUREZZAAAAAAAAAAAAAA
         mpib.setSeculevel(par("Seculevel"));
 
+        int ackOverhead = 6;
+        int secLev = mpib.getSeculevel();
+        bool secEnabled = par("SecurityEnabled");
+
+        if (secEnabled)
+        {
+            if (secLev == 1 || secLev == 5)
+                ackOverhead += 4;
+            else if (secLev == 2 || secLev == 6)
+                ackOverhead += 8;
+            else if (secLev == 3 || secLev == 7)
+                ackOverhead += 16;
+        }
+
         // initialize MacDSN (data sequence number) and MacBSN (beacon sequence number) to random 8-bit values
         //mpib.setMacDSN(intrand(255));
         mpib.setMacBSN(intrand(255));
@@ -97,7 +115,7 @@ void IEEE802154MacAttacker::initialize(int stage)
 
         //mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + ppib.getSHR() + (6 - ppib.getSymbols()));
         ASSERT(getModuleByPath("^.^.PHY") != NULL);// getModuleByPath returns the PHY module here
-        mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + (getModuleByPath("^.^.PHY")->par("SHRDuration").longValue()) + (6 - (getModuleByPath("^.^.PHY")->par("symbolsPerOctet").longValue())));
+        mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + (getModuleByPath("^.^.PHY")->par("SHRDuration").longValue()) + (ackOverhead - (getModuleByPath("^.^.PHY")->par("symbolsPerOctet").longValue())));
 
         // inizialize PHY-related variables from PHY.ned -> FIXME -> PLME-GET msg should be used
         phy_channel = getModuleByPath("^.^.PHY")->par("currentChannel").longValue();
@@ -257,6 +275,10 @@ void IEEE802154MacAttacker::initialize(int stage)
         gtsStartSlot = 0;
         gtsTransDuration = 0;
 
+        //replayProtection
+        replayProtection = par("replayProtection");
+        frameCount = 0;
+
         /**
          *  FIXME --> untested
          *  for indirect transmission
@@ -287,6 +309,8 @@ void IEEE802154MacAttacker::initialize(int stage)
     else if (stage == 1)
     {
         macEV << "Initializing Stage 1 \n";
+
+        idBattery = registerBattery();
 
         WATCH(bPeriod);
         WATCH(inTxSD_txSDTimer);
@@ -667,20 +691,31 @@ void IEEE802154MacAttacker::handleUpperMsg(cMessage *msg)
         {
             Ash assoAsh;
             assoAsh.secu.Seculevel = mpib.getSeculevel();
+
+            if (!increaseFrameCounter(&assoAsh.FrameCount))
+            {
+                macEV << "maxFrameCount reached!";
+                return;
+            }
+
             data->setAsh(assoAsh);
+
+            typePacket = 0;
 
             if (assoAsh.secu.Seculevel == 1 || assoAsh.secu.Seculevel == 2 || assoAsh.secu.Seculevel == 3)
             {
                 data->setMic(secPacket(data->dup()).c_str());
 
             }
-            else if (assoAsh.secu.Seculevel == 5 || assoAsh.secu.Seculevel == 6 || assoAsh.secu.Seculevel == 7)
+            else if (assoAsh.secu.Seculevel == 4 || assoAsh.secu.Seculevel == 5 || assoAsh.secu.Seculevel == 6 || assoAsh.secu.Seculevel == 7)
             {
 
                 data->setPayload(secPacket(data->dup()).c_str());
                 data->getEncapsulatedPacket()->setName("");
 
             }
+
+            drawBattery(IEEE802154MacAttacker::DATA_TEMP);
 
         }
 
@@ -780,7 +815,12 @@ void IEEE802154MacAttacker::handleUpperMsg(cMessage *msg)
                     {
 
                         Ash assoAsh;
-                        assoAsh.FrameCount = 1;
+
+                        if (!increaseFrameCounter(&assoAsh.FrameCount))
+                        {
+                            macEV << "maxFrameCount reached!";
+                            return;
+                        }
                         assoAsh.KeyIdentifier.KeyIndex = frame->getKeyIndex();
                         assoAsh.KeyIdentifier.KeySource = frame->getKeySource();
                         assoAsh.secu.KeyIdMode = frame->getKeyIdMode();
@@ -790,12 +830,14 @@ void IEEE802154MacAttacker::handleUpperMsg(cMessage *msg)
 
                         AssoCommand->setAsh(assoAsh);
 
+                        typePacket = 1;
+
                         if (assoAsh.secu.Seculevel == 1 || assoAsh.secu.Seculevel == 2 || assoAsh.secu.Seculevel == 3)
                         {
                             AssoCommand->setMic(secPacket(AssoCommand->dup()).c_str());
 
                         }
-                        else if (assoAsh.secu.Seculevel == 5 || assoAsh.secu.Seculevel == 6 || assoAsh.secu.Seculevel == 7)
+                        else if (assoAsh.secu.Seculevel == 4 || assoAsh.secu.Seculevel == 5 || assoAsh.secu.Seculevel == 6 || assoAsh.secu.Seculevel == 7)
                         {
 
                             AssoCommand->setPayload(secPacket(AssoCommand->dup()).c_str());
@@ -804,6 +846,8 @@ void IEEE802154MacAttacker::handleUpperMsg(cMessage *msg)
                             AssoCommand->setCapabilityInformation(empty);
 
                         }
+
+                        drawBattery(IEEE802154MacAttacker::ASSOREQ_TEMP);
 
                     }
                     /**
@@ -872,7 +916,11 @@ void IEEE802154MacAttacker::handleUpperMsg(cMessage *msg)
                         ash.secu.Seculevel = assoResp->getSecurityLevel();
                         ash.KeyIdentifier.KeyIndex = assoResp->getKeyIndex();
                         ash.KeyIdentifier.KeySource = assoResp->getKeySource();
-                        ash.FrameCount = 1;
+                        if (!increaseFrameCounter(&ash.FrameCount))
+                        {
+                            macEV << "maxFrameCount reached!";
+                            return;
+                        }
                         assoCmdResp->setAsh(ash);
                     }
 
@@ -1018,7 +1066,11 @@ void IEEE802154MacAttacker::handleUpperMsg(cMessage *msg)
                     if (mpib.getMacSecurityEnabled())
                     {
                         Ash ash;
-                        ash.FrameCount = 1;
+                        if (!increaseFrameCounter(&ash.FrameCount))
+                        {
+                            macEV << "maxFrameCount reached!";
+                            return;
+                        }
                         ash.KeyIdentifier.KeyIndex = GTSrequ->getKeyIndex();
                         ash.KeyIdentifier.KeySource = GTSrequ->getKeySource();
                         ash.secu.KeyIdMode = GTSrequ->getKeyIdMode();
@@ -1328,6 +1380,7 @@ void IEEE802154MacAttacker::handleLowerPLMEMsg(cMessage* msg)
 // handle messages received from PHY via PD-SAP
 void IEEE802154MacAttacker::handleLowerPDMsg(cMessage* msg)
 {
+
     if (dynamic_cast<CmdFrame*>(msg))
     {
         CmdFrame* bcnReq = check_and_cast<CmdFrame*>(msg);
@@ -1456,6 +1509,33 @@ void IEEE802154MacAttacker::handleLowerPDMsg(cMessage* msg)
     frmType = (frameType) ((frmCtrl & ftMask) >> ftShift);
     macEV
     << (frmType == Beacon ? "Beacon" : (frmType == Data ? "Data" : (frmType == Ack ? "Ack" : "Command"))) << " frame received from PHY, start filtering now\n";
+
+    if (mpib.getMacSecurityEnabled())
+    {
+        if (frmType == Command)
+        {
+            mpdu* comm = check_and_cast<mpdu *>(frame->getEncapsulatedPacket());
+
+            if (!checkSecFrameCounter(comm->getSrc().str(), comm->getAsh().FrameCount))
+            {
+                macEV << "frame dropped due to frameCounter error \n";
+                delete (frame);
+                return;
+            }
+
+        }
+        else
+        {
+            if (!checkSecFrameCounter(frame->getSrc().str(), frame->getAsh().FrameCount))
+            {
+                macEV << "frame dropped due to frameCounter error \n";
+                delete (frame);
+                return;
+            }
+
+        }
+
+    }
 
     // check timing for GTS (debug)
     if (frmType == Data && frame->getIsGTS())
@@ -1705,7 +1785,7 @@ void IEEE802154MacAttacker::handleBeacon(mpdu *frame)
                 rxSfSpec = bcnFrame->getSfSpec();
 
             }
-            else if (bcnFrame->getAsh().secu.Seculevel == 5 || bcnFrame->getAsh().secu.Seculevel == 6 || bcnFrame->getAsh().secu.Seculevel == 7)
+            else if (bcnFrame->getAsh().secu.Seculevel == 4 || bcnFrame->getAsh().secu.Seculevel == 5 || bcnFrame->getAsh().secu.Seculevel == 6 || bcnFrame->getAsh().secu.Seculevel == 7)
             {
 
                 std::string encoded = secRecPacket(bcnFrame);
@@ -1730,7 +1810,7 @@ void IEEE802154MacAttacker::handleBeacon(mpdu *frame)
 
             //std::cout << "RXSFSPEC  " << endl;
             //std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
-
+            drawBattery(IEEE802154MacAttacker::BEACON_TEMP);
         }
         else
         {
@@ -1836,6 +1916,7 @@ void IEEE802154MacAttacker::handleAck(cMessage* frame)
     if (mpib.getMacSecurityEnabled())
     {
         secRecAck(ack->dup(), mpib.getSeculevel());
+        drawBattery(IEEE802154MacAttacker::ACK_TEMP);
 
     }
 
@@ -1918,7 +1999,7 @@ void IEEE802154MacAttacker::handleData(mpdu* frame)
             secRecPacket(frame);
 
         }
-        else if (frame->getAsh().secu.Seculevel == 5 || frame->getAsh().secu.Seculevel == 6 || frame->getAsh().secu.Seculevel == 7)
+        else if (frame->getAsh().secu.Seculevel == 4 || frame->getAsh().secu.Seculevel == 5 || frame->getAsh().secu.Seculevel == 6 || frame->getAsh().secu.Seculevel == 7)
         {
 
             std::string encoded = secRecPacket(frame);
@@ -1928,7 +2009,7 @@ void IEEE802154MacAttacker::handleData(mpdu* frame)
 
         //std::cout << "RXSFSPEC  " << endl;
         //std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
-
+        drawBattery(IEEE802154MacAttacker::DATA_TEMP);
     }
 
     rxData = (frame->dup());
@@ -1957,6 +2038,7 @@ void IEEE802154MacAttacker::handleCommand(mpdu* frame)
                 if (mpib.getMacSecurityEnabled())
                 {
 
+                    typePacketRec = 1;
                     /**
                      std::cout << " TESTO DECIFRATO IN HEX" << endl;
                      printHex(encoded);
@@ -1977,7 +2059,7 @@ void IEEE802154MacAttacker::handleCommand(mpdu* frame)
                         assoInd->setCapabilityInformation(tmpAssoReq->getCapabilityInformation());
 
                     }
-                    else if (tmpAssoReq->getAsh().secu.Seculevel == 5 || tmpAssoReq->getAsh().secu.Seculevel == 6 || tmpAssoReq->getAsh().secu.Seculevel == 7)
+                    else if (tmpAssoReq->getAsh().secu.Seculevel == 4 || tmpAssoReq->getAsh().secu.Seculevel == 5 || tmpAssoReq->getAsh().secu.Seculevel == 6 || tmpAssoReq->getAsh().secu.Seculevel == 7)
                     {
 
                         std::string encoded = secRecPacket(tmpAssoReq);
@@ -1996,6 +2078,7 @@ void IEEE802154MacAttacker::handleCommand(mpdu* frame)
                         assoInd->setCapabilityInformation(tempDevCap);
 
                     }
+                    drawBattery(IEEE802154MacAttacker::ASSOREQ_TEMP);
 
                 }
                 else
@@ -2049,13 +2132,15 @@ void IEEE802154MacAttacker::handleCommand(mpdu* frame)
                 if (mpib.getMacSecurityEnabled())
                 {
 
+                    typePacketRec = 2;
+
                     if (aresp->getAsh().secu.Seculevel == 1 || aresp->getAsh().secu.Seculevel == 2 || aresp->getAsh().secu.Seculevel == 3)
                     {
 
                         secRecPacket(aresp);
 
                     }
-                    else if (aresp->getAsh().secu.Seculevel == 5 || aresp->getAsh().secu.Seculevel == 6 || aresp->getAsh().secu.Seculevel == 7)
+                    else if (aresp->getAsh().secu.Seculevel == 4 || aresp->getAsh().secu.Seculevel == 5 || aresp->getAsh().secu.Seculevel == 6 || aresp->getAsh().secu.Seculevel == 7)
                     {
 
                         std::string encoded = secRecPacket(aresp);
@@ -2071,6 +2156,7 @@ void IEEE802154MacAttacker::handleCommand(mpdu* frame)
                         aresp->setStatus(status);
 
                     }
+                    drawBattery(IEEE802154MacAttacker::ASSORESP_TEMP);
 
                 }
 
@@ -2293,13 +2379,25 @@ void IEEE802154MacAttacker::handle_PLME_SET_TRX_STATE_confirm(phyState status)
         else if ((rxData != NULL)) // beacon enabled PAN - processing DATA frame
         {
             // here we use the hidden destination address that we already set in ACK on purpose
-            delay = csmacaLocateBoundary((rxData->getSrc().getShortAddr() == mpib.getMacCoordShortAddress()), 0.0);
+            delay = csmacaLocateBoundary((rxData->getSrc().getShortAddr() == mpib.getMacCoordShortAddress()), 0.0) + dataTemp;
             ASSERT(delay < bPeriod);
         }
         else if ((rxCmd != NULL)) // beacon enabled PAN - processing CMD frame
         {
             // here we use the hidden destination address that we already set in ACK on purpose
-            delay = csmacaLocateBoundary((rxCmd->getSrc().getShortAddr() == mpib.getMacCoordShortAddress()), 0.0);
+            if (typePacketRec == 1)
+            {
+
+                delay = csmacaLocateBoundary((rxCmd->getSrc().getShortAddr() == mpib.getMacCoordShortAddress()), 0.0) + assoreqTemp;
+
+            }
+            else
+            {
+
+                delay = csmacaLocateBoundary((rxCmd->getSrc().getShortAddr() == mpib.getMacCoordShortAddress()), 0.0) + assorespTemp;
+
+            }
+
             ASSERT(delay < bPeriod);
         }
 
@@ -2856,7 +2954,9 @@ void IEEE802154MacAttacker::genACK(unsigned char dsn, bool fp)
     ack->setFcs(0);
     if (mpib.getMacSecurityEnabled())
     {
+        //string prova= secAck(ack->dup(), mpib.getSeculevel()).c_str();
         ack->setMic(secAck(ack->dup(), mpib.getSeculevel()).c_str());
+        drawBattery(IEEE802154MacAttacker::ACK_TEMP);
     }
     ack->setByteLength(calcFrameByteLength(ack));
     ASSERT(!txAck); // It's impossible to receive the second packet before the ACK has been sent out!
@@ -2898,15 +2998,21 @@ void IEEE802154MacAttacker::genAssoResp(MlmeAssociationStatus status, AssoCmdreq
         Ash assoAsh;
 
         assoAsh.secu.Seculevel = mpib.getSeculevel();
+        if (!increaseFrameCounter(&assoAsh.FrameCount))
+        {
+            macEV << "maxFrameCount reached!";
+            return;
+        }
 
         assoResp->setAsh(assoAsh);
 
+        typePacket = 2;
         if (assoAsh.secu.Seculevel == 1 || assoAsh.secu.Seculevel == 2 || assoAsh.secu.Seculevel == 3)
         {
             assoResp->setMic(secPacket(assoResp->dup()).c_str());
 
         }
-        else if (assoAsh.secu.Seculevel == 5 || assoAsh.secu.Seculevel == 6 || assoAsh.secu.Seculevel == 7)
+        else if (assoAsh.secu.Seculevel == 4 || assoAsh.secu.Seculevel == 5 || assoAsh.secu.Seculevel == 6 || assoAsh.secu.Seculevel == 7)
         {
 
             assoResp->setPayload(secPacket(assoResp->dup()).c_str());
@@ -2914,6 +3020,7 @@ void IEEE802154MacAttacker::genAssoResp(MlmeAssociationStatus status, AssoCmdreq
             assoResp->setShortAddress(65535); // 16bit short address, value of 0xffff (65.535) indicates that the device does not have a short address
 
         }
+        drawBattery(IEEE802154MacAttacker::ASSORESP_TEMP);
 
     }
 
@@ -3030,7 +3137,11 @@ void IEEE802154MacAttacker::genDisAssoCmd(DisAssociation* disAss, bool direct)
             Ash ash;
             ash.secu.KeyIdMode = disAss->getKeyIdMode();
             ash.secu.Seculevel = disAss->getSecurityLevel();
-            ash.FrameCount = 1;
+            if (!increaseFrameCounter(&ash.FrameCount))
+            {
+                macEV << "maxFrameCount reached!";
+                return;
+            }
             ash.KeyIdentifier.KeyIndex = disAss->getKeyIndex();
             ash.KeyIdentifier.KeySource = disAss->getKeySource();
             disCmd->setAsh(ash);
@@ -3183,7 +3294,18 @@ void IEEE802154MacAttacker::genBeaconInd(mpdu* frame)
         bNotify->setSduLength(bFrame->getEncapsulatedPacket()->getByteLength());
         bNotify->encapsulate(bFrame->decapsulate());
     }
-    send(bNotify, "outMLME");
+
+    if (mpib.getMacSecurityEnabled())
+    {
+
+        sendDelayed(bNotify, beaconTemp, "outMLME");
+
+    }
+    else
+    {
+        send(bNotify, "outMLME");  // send a duplication
+    }
+
 }
 
 void IEEE802154MacAttacker::genGTSConf(GTSDescriptor gts, MACenum status)
@@ -4492,7 +4614,7 @@ void IEEE802154MacAttacker::startTxAckBoundTimer(simtime_t wtime)
     {
         cancelEvent(txAckBoundTimer);
     }
-    scheduleAt(simTime() + wtime, txAckBoundTimer);
+    scheduleAt(simTime() + wtime + ackTemp, txAckBoundTimer);
 }
 
 void IEEE802154MacAttacker::startTxCmdDataBoundTimer(simtime_t wtime)
@@ -4501,7 +4623,30 @@ void IEEE802154MacAttacker::startTxCmdDataBoundTimer(simtime_t wtime)
     {
         cancelEvent(txCmdDataBoundTimer);
     }
-    scheduleAt(simTime() + wtime, txCmdDataBoundTimer);
+    if (mpib.getMacSecurityEnabled())
+    {
+
+        switch (typePacket)
+        {
+
+            case 0:
+                scheduleAt(simTime() + wtime + dataTemp, txCmdDataBoundTimer);
+                break;
+            case 1:
+                scheduleAt(simTime() + wtime + assoreqTemp, txCmdDataBoundTimer);
+                break;
+            case 2:
+                scheduleAt(simTime() + wtime + assorespTemp, txCmdDataBoundTimer);
+                break;
+
+        }
+
+    }
+    else
+    {
+        scheduleAt(simTime() + wtime, txCmdDataBoundTimer);
+    }
+
 }
 
 void IEEE802154MacAttacker::startIfsTimer(IFSType ifsType)
@@ -4964,6 +5109,11 @@ void IEEE802154MacAttacker::handleBcnTxTimer()
             {
                 Ash assoAsh;
                 assoAsh.secu.Seculevel = mpib.getSeculevel();
+                if (!increaseFrameCounter(&assoAsh.FrameCount))
+                {
+                    macEV << "maxFrameCount reached!";
+                    return;
+                }
                 tmpBcn->setAsh(assoAsh);
 
                 if (assoAsh.secu.Seculevel == 1 || assoAsh.secu.Seculevel == 2 || assoAsh.secu.Seculevel == 3)
@@ -4972,7 +5122,7 @@ void IEEE802154MacAttacker::handleBcnTxTimer()
                     tmpBcn->setMic(secPacket(tmpBcn->dup()).c_str());
 
                 }
-                else if (assoAsh.secu.Seculevel == 5 || assoAsh.secu.Seculevel == 6 || assoAsh.secu.Seculevel == 7)
+                else if (assoAsh.secu.Seculevel == 4 || assoAsh.secu.Seculevel == 5 || assoAsh.secu.Seculevel == 6 || assoAsh.secu.Seculevel == 7)
                 {
 
                     tmpBcn->setPayload(secPacket(tmpBcn->dup()).c_str());
@@ -4980,6 +5130,8 @@ void IEEE802154MacAttacker::handleBcnTxTimer()
                     //tmpBcn->setSfSpec(nullSfspec);
 
                 }
+
+                drawBattery(IEEE802154MacAttacker::BEACON_TEMP);
 
             }
 
@@ -5255,7 +5407,19 @@ void IEEE802154MacAttacker::handleBcnTxTimer()
             txPkt = tmpBcn;
             mpib.setMacBeaconTxTime(simTime());  // no delay
             inTransmission = true;  // cleared by PD_DATA_confirm
-            send(txBeacon->dup(), "outPD");  // send a duplication
+            if (mpib.getMacSecurityEnabled())
+            {
+
+                //std::cout << "WEEEEEEEEEEEEEEEEEEEEEE " << beaconTemp << endl;
+                sendDelayed(txBeacon->dup(), beaconTemp, "outPD");  // send a duplication
+                //send(txBeacon->dup(), "outPD");  // send a duplication
+
+            }
+            else
+            {
+                send(txBeacon->dup(), "outPD");  // send a duplication
+            }
+
             macEV
             << "Sending frame " << txBeacon->getName() << " (" << txBeacon->getByteLength() << " Bytes) to PHY layer \n";
             macEV << "The estimated transmission time is " << calcDuration(txBeacon) << " sec \n";
@@ -6612,6 +6776,45 @@ std::string IEEE802154MacAttacker::AEADCypher128(std::string adata, std::string 
 
 }
 
+std::string IEEE802154MacAttacker::CTRCypher(std::string pdata)
+{
+
+    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
+
+    byte iv[] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+
+    string cipher;
+
+    std::stringstream temp;
+
+    HexEncoder encoder(new FileSink(temp));
+
+    try
+    {
+
+        CTR_Mode<AES>::Encryption e;
+        e.SetKeyWithIV(key, sizeof(key), iv, sizeof(iv));
+        // e.SetKeyWithIV( key, key.size(), ctr );
+
+        // The StreamTransformationFilter adds padding
+        //  as required. ECB and CBC Mode must be padded
+        //  to the block size of the cipher. CTR does not.
+        StringSource ss1(pdata, true, new StreamTransformationFilter(e, new StringSink(cipher)) // StreamTransformationFilter
+        );// StringSource
+
+        encoder.Put((const byte *) cipher.data(), cipher.size());
+        return temp.str();
+
+    }
+    catch (CryptoPP::Exception& e)
+    {
+        cerr << e.what() << endl;
+        exit(1);
+        return 0;
+    }
+
+}
+
 std::string IEEE802154MacAttacker::AEADDecypher32(std::string cipher, std::string radata)
 {
 
@@ -6680,8 +6883,8 @@ std::string IEEE802154MacAttacker::AEADDecypher32(std::string cipher, std::strin
         //assert( rpdata == pdata );
 
         // All is well - work with data
-        cout << "Decrypted and Verified data. Ready for use." << endl;
-        cout << endl;
+        //cout << "Decrypted and Verified data. Ready for use." << endl;
+        //cout << endl;
         // cout << "DECIFRATURA rpdata: " << retrieved.data() << endl;
 
         return retrieved;
@@ -6767,8 +6970,8 @@ std::string IEEE802154MacAttacker::AEADDecypher64(std::string cipher, std::strin
         //assert( rpdata == pdata );
 
         // All is well - work with data
-        cout << "Decrypted and Verified data. Ready for use." << endl;
-        cout << endl;
+        //cout << "Decrypted and Verified data. Ready for use." << endl;
+        //cout << endl;
         // cout << "DECIFRATURA rpdata: " << retrieved.data() << endl;
 
         return retrieved;
@@ -6854,8 +7057,8 @@ std::string IEEE802154MacAttacker::AEADDecypher128(std::string cipher, std::stri
         //assert( rpdata == pdata );
 
         // All is well - work with data
-        cout << "Decrypted and Verified data. Ready for use." << endl;
-        cout << endl;
+        //cout << "Decrypted and Verified data. Ready for use." << endl;
+        //cout << endl;
         // cout << "DECIFRATURA rpdata: " << retrieved.data() << endl;
 
         return retrieved;
@@ -6873,6 +7076,36 @@ std::string IEEE802154MacAttacker::AEADDecypher128(std::string cipher, std::stri
 
 }
 
+std::string IEEE802154MacAttacker::CTRDecypher(std::string cypher)
+{
+
+    byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
+
+    byte iv[] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+
+    string recovered;
+
+    try
+    {
+        CTR_Mode<AES>::Decryption d;
+        d.SetKeyWithIV(key, sizeof(key), iv, sizeof(iv));
+
+        // The StreamTransformationFilter removes
+        //  padding as required.
+        StringSource ss3(cypher, true, new StreamTransformationFilter(d, new StringSink(recovered)) // StreamTransformationFilter
+        );// StringSource
+
+        return recovered;
+    }
+    catch (CryptoPP::Exception& e)
+    {
+        cerr << e.what() << endl;
+        exit(1);
+        return 0;
+    }
+
+}
+
 std::string IEEE802154MacAttacker::CBCMACAuth32(std::string plain)
 {
 
@@ -6881,7 +7114,7 @@ std::string IEEE802154MacAttacker::CBCMACAuth32(std::string plain)
     string mac;
 
     stringstream temp;
-    HexEncoder stamp(new FileSink(cout));
+    //HexEncoder stamp(new FileSink(cout));
     HexEncoder encoder(new FileSink(temp));
     //HexDecoder decoder(new FileSink(cout));
 
@@ -6894,8 +7127,8 @@ std::string IEEE802154MacAttacker::CBCMACAuth32(std::string plain)
         cbcmac.Final((byte*) &mac[0]);
 
         //std::cout << "MAC (" << mac.size() << " bytes)" << std::endl;
-        stamp.Put((const byte*) mac.data(), mac.size());
-        stamp.MessageEnd();
+        //stamp.Put((const byte*) mac.data(), mac.size());
+        //stamp.MessageEnd();
         //std::cout << std::endl << std::endl;
 
         /**
@@ -6953,7 +7186,7 @@ std::string IEEE802154MacAttacker::CBCMACAuth64(std::string plain)
     string mac;
 
     stringstream temp;
-    HexEncoder stamp(new FileSink(cout));
+    //HexEncoder stamp(new FileSink(cout));
     HexEncoder encoder(new FileSink(temp));
     //HexDecoder decoder(new FileSink(cout));
 
@@ -6966,8 +7199,8 @@ std::string IEEE802154MacAttacker::CBCMACAuth64(std::string plain)
         cbcmac.Final((byte*) &mac[0]);
 
         //std::cout << "MAC (" << mac.size() << " bytes)" << std::endl;
-        stamp.Put((const byte*) mac.data(), mac.size());
-        stamp.MessageEnd();
+        //stamp.Put((const byte*) mac.data(), mac.size());
+        //stamp.MessageEnd();
         //std::cout << std::endl << std::endl;
 
         /**
@@ -7025,7 +7258,7 @@ std::string IEEE802154MacAttacker::CBCMACAuth128(std::string plain)
     string mac;
 
     stringstream temp;
-    HexEncoder stamp(new FileSink(cout));
+    //HexEncoder stamp(new FileSink(cout));
     HexEncoder encoder(new FileSink(temp));
     //HexDecoder decoder(new FileSink(cout));
 
@@ -7038,8 +7271,8 @@ std::string IEEE802154MacAttacker::CBCMACAuth128(std::string plain)
         cbcmac.Final((byte*) &mac[0]);
 
         //std::cout << "MAC (" << mac.size() << " bytes)" << std::endl;
-        stamp.Put((const byte*) mac.data(), mac.size());
-        stamp.MessageEnd();
+        //stamp.Put((const byte*) mac.data(), mac.size());
+        //stamp.MessageEnd();
         //std::cout << std::endl << std::endl;
 
         /**
@@ -7096,7 +7329,7 @@ void IEEE802154MacAttacker::CBCMACVerify32(std::string plain, std::string mac)
 
     //stringstream temp;
 
-    HexEncoder encoder(new FileSink(cout));
+    //HexEncoder encoder(new FileSink(cout));
 
     //AutoSeededRandomPool prng;
 
@@ -7106,8 +7339,8 @@ void IEEE802154MacAttacker::CBCMACVerify32(std::string plain, std::string mac)
     // Verify
 
     //std::cout << "MAC  verify (" << mac.size() << " bytes)" << std::endl;
-    encoder.Put((const byte *) mac.data(), mac.size());
-    encoder.MessageEnd();
+    //encoder.Put((const byte *) mac.data(), mac.size());
+    //encoder.MessageEnd();
     //std::cout << std::endl << std::endl;
 
     try
@@ -7151,7 +7384,7 @@ void IEEE802154MacAttacker::CBCMACVerify32(std::string plain, std::string mac)
          std::cout << std::endl << std::endl;
          **/
 
-        cout << "Verified message MAC" << endl;
+        //cout << "Verified message MAC" << endl;
     }
     catch (const CryptoPP::Exception& e)
     {
@@ -7169,7 +7402,7 @@ void IEEE802154MacAttacker::CBCMACVerify64(std::string plain, std::string mac)
 
     //stringstream temp;
 
-    HexEncoder encoder(new FileSink(cout));
+    //HexEncoder encoder(new FileSink(cout));
 
     //AutoSeededRandomPool prng;
 
@@ -7179,8 +7412,8 @@ void IEEE802154MacAttacker::CBCMACVerify64(std::string plain, std::string mac)
     // Verify
 
     //std::cout << "MAC  verify (" << mac.size() << " bytes)" << std::endl;
-    encoder.Put((const byte *) mac.data(), mac.size());
-    encoder.MessageEnd();
+    //encoder.Put((const byte *) mac.data(), mac.size());
+    //encoder.MessageEnd();
     //std::cout << std::endl << std::endl;
 
     try
@@ -7224,7 +7457,7 @@ void IEEE802154MacAttacker::CBCMACVerify64(std::string plain, std::string mac)
          std::cout << std::endl << std::endl;
          **/
 
-        cout << "Verified message MAC" << endl;
+        //cout << "Verified message MAC" << endl;
     }
     catch (const CryptoPP::Exception& e)
     {
@@ -7242,7 +7475,7 @@ void IEEE802154MacAttacker::CBCMACVerify128(std::string plain, std::string mac)
 
     //stringstream temp;
 
-    HexEncoder encoder(new FileSink(cout));
+    //HexEncoder encoder(new FileSink(cout));
 
     //AutoSeededRandomPool prng;
 
@@ -7252,8 +7485,8 @@ void IEEE802154MacAttacker::CBCMACVerify128(std::string plain, std::string mac)
     // Verify
 
     //std::cout << "MAC  verify (" << mac.size() << " bytes)" << std::endl;
-    encoder.Put((const byte *) mac.data(), mac.size());
-    encoder.MessageEnd();
+    //encoder.Put((const byte *) mac.data(), mac.size());
+    //encoder.MessageEnd();
     //std::cout << std::endl << std::endl;
 
     try
@@ -7297,7 +7530,7 @@ void IEEE802154MacAttacker::CBCMACVerify128(std::string plain, std::string mac)
          std::cout << std::endl << std::endl;
          **/
 
-        cout << "Verified message MAC" << endl;
+        //cout << "Verified message MAC" << endl;
     }
     catch (const CryptoPP::Exception& e)
     {
@@ -7789,6 +8022,10 @@ std::string IEEE802154MacAttacker::secPacket(mpdu *frame)
             //strncpy(&result[0], &CBCMACAuth(adata)[0], 16);
             result = CBCMACAuth128(adata);
             break;
+        case 4:
+            setAPDATA(&adata, &pdata, frame, true);
+            result = CTRCypher(pdata);
+            break;
         case 5:
             setAPDATA(&adata, &pdata, frame, true);
             result = AEADCypher32(adata, pdata);
@@ -7833,6 +8070,7 @@ std::string IEEE802154MacAttacker::secRecPacket(mpdu *frame)
 {
 
     std::string radata;
+    //std::string rpdata;
     std::string null;
 //std::string cipher = frame->getPayload();
     std::string decipherT;
@@ -7860,6 +8098,11 @@ std::string IEEE802154MacAttacker::secRecPacket(mpdu *frame)
             decoder.Put((const byte *) frame->getMic(), 32);
             //std::cout << temp.str();
             CBCMACVerify128(radata, temp.str());
+            break;
+        case 4:
+            //setAPDATA(&radata, &rpdata, frame, true);
+            decoder.Put((const byte *) frame->getPayload(), strlen(frame->getPayload()));
+            decipherT = CTRDecypher(temp.str());
             break;
         case 5:
             setAPDATA(&radata, &null, frame, false);
@@ -7924,6 +8167,8 @@ std::string IEEE802154MacAttacker::secAck(AckFrame* ack, int secuLevel)
             setADATAck(&adata, ack);
             result = CBCMACAuth128(adata);
             break;
+        case 4:
+            break;
         case 5:
             setADATAck(&adata, ack);
             result = CBCMACAuth32(adata);
@@ -7972,6 +8217,8 @@ void IEEE802154MacAttacker::secRecAck(AckFrame* ack, int secuLevel)
             decoder.Put((const byte *) ack->getMic(), 32);
             //std::cout << temp.str();
             CBCMACVerify128(radata, temp.str());
+            break;
+        case 4:
             break;
         case 5:
             setADATAck(&radata, ack);
@@ -8052,10 +8299,6 @@ vector<string> IEEE802154MacAttacker::parserSecMessage(std::string str, char ch)
 int IEEE802154MacAttacker::calcByteMicLenght(bool securityEnable, int secuLevel)
 {
 
-    std::cout << "\n ATTACKER \n\n";
-    macEV << "\n ATTACKER \n\n";
-
-
     if (!securityEnable)
         return 0;
 
@@ -8075,8 +8318,6 @@ int IEEE802154MacAttacker::calcByteMicLenght(bool securityEnable, int secuLevel)
 int IEEE802154MacAttacker::calcBytePayload(int type, bool securityEnable, int secuLevel)
 {
     //il tutto serve per arrotondare il pacchetto cifrato alla lunghezza di un multiplo di 128bit (16byte)
-
-
 
     /**
      int tmp = lenghtPayload;
@@ -8123,7 +8364,7 @@ int IEEE802154MacAttacker::calcBytePayload(int type, bool securityEnable, int se
             case 0: //beacon
 
                 lenght += 6;  //mac payload senza beacon payload
-                if (secuLevel == 5)
+                if (secuLevel==4 || secuLevel == 5 )
                     lenght += 16;   // 8byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
                     lenght += 16;     //8byte +8 byte
@@ -8136,7 +8377,7 @@ int IEEE802154MacAttacker::calcBytePayload(int type, bool securityEnable, int se
             case 1: //data
 
                 //lenght += 6;  //mac payload senza beacon payload
-                if (secuLevel == 5)
+                if (secuLevel==4 || secuLevel == 5)
                     lenght += 16;   // 8byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
                     lenght += 16;     //8byte +8 byte
@@ -8149,7 +8390,7 @@ int IEEE802154MacAttacker::calcBytePayload(int type, bool securityEnable, int se
             case 2: //assoreq
 
                 lenght += 1;  //command id
-                if (secuLevel == 5)
+                if (secuLevel==4 || secuLevel == 5)
                     lenght += 16;   // 1 byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
                     lenght += 16;     //1 byte +8 byte
@@ -8162,7 +8403,7 @@ int IEEE802154MacAttacker::calcBytePayload(int type, bool securityEnable, int se
             case 3: //assoresp
 
                 lenght += 1;  //command id
-                if (secuLevel == 5)
+                if (secuLevel==4 || secuLevel == 5)
                     lenght += 16;   // 3 byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
                     lenght += 16;     //3 byte +8 byte
@@ -8208,6 +8449,129 @@ int IEEE802154MacAttacker::calcBytePayload(int type, bool securityEnable, int se
     return lenght;
 }
 
+int IEEE802154MacAttacker::registerBattery()
+{
+    BasicBattery *bat = BatteryAccess().getIfExists();
+    if (bat)
+    {
+        AckCurrent = par("AckCurrent");
+        PacketCurrent = par("PacketCurrent");
+        beaconTemp = par("beaconTemp");
+        dataTemp = par("dataTemp");
+        ackTemp = par("ackTemp");
+        assoreqTemp = par("assoreqTemp");
+        assorespTemp = par("assorespTemp");
+        idHost = par("idHost");
+        // read parameters
+        // double mUsageIEEE802154RadioIdle = par("usage_IEEE802154Radio_idle");
+        //double mUsageIEEE802154RadioRecv = par("usage_IEEE802154Radio_recv");
+        // double mUsageIEEE802154RadioSleep = par("usage_IEEE802154Radio_sleep");
+        // double mUsageIEEE802154RadioSend = par("usage_IEEE802154Radio_send");
+        // if ((mUsageIEEE802154RadioIdle < 0) || (mUsageIEEE802154RadioRecv < 0) || (mUsageIEEE802154RadioSleep < 0) || (mUsageIEEE802154RadioSend < 0))
+        //{
+        //     return;
+        // }
+        bat->setIdHost(idHost);
+        return bat->registerDevice(this, 5);
+    }
+    return -1;
+}
+
+void IEEE802154MacAttacker::drawBattery(int activity)
+{
+
+    BasicBattery *bat = BatteryAccess().getIfExists();
+    if (bat)
+    {
+        DrawAmount currentDraw;
+        switch (activity)
+        {
+            case IEEE802154MacAttacker::BEACON_TEMP:
+                currentDraw =
+                {   DrawAmount::CURRENT, PacketCurrent};
+                bat->drawMAC(idBattery, currentDraw, IEEE802154MacAttacker::BEACON_TEMP, beaconTemp);
+                break;
+                case IEEE802154MacAttacker::ACK_TEMP:
+                currentDraw =
+                {   DrawAmount::CURRENT, AckCurrent};
+                bat->drawMAC(idBattery, currentDraw, IEEE802154MacAttacker::ACK_TEMP, ackTemp);
+                break;
+                case IEEE802154MacAttacker::DATA_TEMP:
+                currentDraw =
+                {   DrawAmount::CURRENT, PacketCurrent};
+                bat->drawMAC(idBattery, currentDraw, IEEE802154MacAttacker::DATA_TEMP, dataTemp);
+                break;
+                case IEEE802154MacAttacker::ASSORESP_TEMP:
+                currentDraw =
+                {   DrawAmount::CURRENT, PacketCurrent};
+                bat->drawMAC(idBattery, currentDraw, IEEE802154MacAttacker::ASSORESP_TEMP, assorespTemp);
+                break;
+                case IEEE802154MacAttacker::ASSOREQ_TEMP:
+                currentDraw =
+                {   DrawAmount::CURRENT, PacketCurrent};
+                bat->drawMAC(idBattery, currentDraw, IEEE802154MacAttacker::ASSOREQ_TEMP, assoreqTemp);
+                break;
+
+            }
+
+        }
+
+    }
+
+bool IEEE802154MacAttacker::checkSecFrameCounter(std::string mac, unsigned int frameCounter)
+{
+    if (replayProtection)
+    {
+
+        if (frameCounter == 0xffffffff)
+            return false;
+
+        if (secFrameCounter.find(mac) == secFrameCounter.end())
+        {
+            secFrameCounter[mac] = frameCounter + 1;
+            cout << " nuova istanza per il mac: " << mac << " | con frame counter : " << frameCounter << endl;
+            return true;
+        }
+        else
+        {
+            if (frameCounter >= secFrameCounter[mac])
+            {
+                secFrameCounter[mac] = frameCounter + 1;
+                cout << " presente il mac: " << mac << " | con frame counter : " << frameCounter << endl;
+                return true;
+            }
+            else
+            {  //frameCounter < secframeCounter quindi è un pacchetto replayed
+                return false;
+            }
+        }
+    }
+
+    return true;
+
+}
+
+bool IEEE802154MacAttacker::increaseFrameCounter(unsigned int * ashFrameCount)
+{
+
+    if (replayProtection)
+    {
+
+        if (frameCount == 0xffffffff)
+        {
+            //macEV << "maxFrameCount reached!";
+            return false;
+
+        }
+        *ashFrameCount = frameCount;
+        frameCount++;
+        cout << " incremento del frameCounter per il mac: " << this->myMacAddr << " | con frame counter : " << frameCount << endl;
+        return true;
+    }
+
+    *ashFrameCount = 1;
+    return true;
+}
 /***************************** DA QUI IN POI È ROBA LORO *******************************/
 
 void IEEE802154MacAttacker::finish()

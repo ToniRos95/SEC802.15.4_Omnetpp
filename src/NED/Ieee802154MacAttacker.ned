@@ -22,15 +22,15 @@ simple IEEE802154MacAttacker
 {
     parameters:
         bool macDebug = default(false);         	// debug output switch for the IEEE 802.15.4 MAC module
-        
+
         string macAddr = default("auto"); 	    	// MAC address as hex string (16 hex digits), or "auto" 
                                                 	// "auto" values are replaced by a generated MAC address in init stage 0    
         bool isPANCoordinator = default(false); 	// either first device online chooses to be PAN coordinator or set manually together with startWithoutStartReq
         bool startWithoutStartReq = default(false); // start immediately without requiring a MLME-START.request
         string panCoordinatorName;              	// name your PAN coordinator
-        
-        int BeaconOrder = default (15);         	// value (0..15), default 15 = beacon disabled 
-        int SuperframeOrder = default (15);     	// value (0..15), default 15 = superframe/beacons disabled
+
+        int BeaconOrder = default(15);         	// value (0..15), default 15 = beacon disabled 
+        int SuperframeOrder = default(15);     	// value (0..15), default 15 = superframe/beacons disabled
 
         bool isRecvGts;
         int gtsPayload;
@@ -39,8 +39,20 @@ simple IEEE802154MacAttacker
         bool promiscuousMode = default(false);  	// set to true to enable promicious mode (accept all packages)
         bool SecurityEnabled = default(false);
         bool isFFD = default(true);             	// full function devices yes/no
-        
+
+             
       	int Seculevel;
+      	double AckCurrent;
+      	double PacketCurrent;
+      	double beaconTemp;
+      	double dataTemp;
+      	double ackTemp;
+      	double assorespTemp;
+      	double assoreqTemp;
+      	
+      	int idHost;
+      	bool replayProtection;
+
 
     gates:
         // LLC interface

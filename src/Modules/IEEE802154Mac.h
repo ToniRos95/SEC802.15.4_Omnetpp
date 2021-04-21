@@ -311,9 +311,11 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         std::string AEADCypher32(std::string adata, std::string pdata);
         std::string AEADCypher64(std::string adata, std::string pdata);
         std::string AEADCypher128(std::string adata, std::string pdata);
+        std::string CTRCypher(std::string pdata);
         std::string AEADDecypher32(std::string cypher, std::string radata);
         std::string AEADDecypher64(std::string cypher, std::string radata);
         std::string AEADDecypher128(std::string cypher, std::string radata);
+        std::string CTRDecypher(std::string cypher);
         std::string CBCMACAuth32(std::string plain);
         std::string CBCMACAuth64(std::string plain);
         std::string CBCMACAuth128(std::string plain);
@@ -331,7 +333,8 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         std::vector<std::string> parserSecMessage(std::string str, char ch);
         int calcByteMicLenght(bool securityEnable, int secuLevel);
         int calcBytePayload(int type, bool securityEnable, int secuLevel);
-        int calcSecFrameCounter();
+        bool checkSecFrameCounter(std::string mac,unsigned int frameCounter);
+        bool increaseFrameCounter(unsigned int * ashFrameCount);
 
         ///BATTERIA
         int  registerBattery();
@@ -363,6 +366,7 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         unsigned int headerSize;
         cMessage* selfMsg;
         bool replayProtection;
+        unsigned int frameCount;
 
         // Message Types
         std::map<std::string, PIBMsgTypes> mappedMsgTypes;

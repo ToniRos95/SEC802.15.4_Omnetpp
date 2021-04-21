@@ -477,3 +477,31 @@ Tcl error: moduleinspector.cc#627: ptr0x56103fb78410 not found
 >>>>>>> branch 'main' of https://github.com/ToniRos95/INETSTANDALONE.git
 
 
+----------------------------------------------------------------------
+
+
+Tcl error: moduleinspector.cc#627: ptr0x564ee1f5f7c0 not found
+    while executing
+"error "$tag not found""
+    (procedure "ModuleInspector:getSubmodCoords" line 4)
+    invoked from within
+"ModuleInspector:getSubmodCoords $c $modptr"
+    (procedure "ModuleInspector:drawNextEventMarker" line 2)
+    invoked from within
+"ModuleInspector:drawNextEventMarker .network.c ptr0x564ee1f5f7c0 1"
+
+
+----------------------------------------------------------------------
+
+
+Tcl error: moduleinspector.cc#627: ptr0x55a64d4e6a10 not found
+    while executing
+"error "$tag not found""
+    (procedure "ModuleInspector:getSubmodCoords" line 4)
+    invoked from within
+"ModuleInspector:getSubmodCoords $c $modptr"
+    (procedure "ModuleInspector:drawNextEventMarker" line 2)
+    invoked from within
+"ModuleInspector:drawNextEventMarker .network.c ptr0x55a64d4e6a10 1"
+
+

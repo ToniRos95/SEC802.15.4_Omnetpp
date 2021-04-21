@@ -147,8 +147,13 @@ class IEEE802154MacAttacker : public cSimpleModule, public INotifiable
         IEEE802154MacAttacker();
         ~IEEE802154MacAttacker();
 
+
         /** @brief Counter to go through device list for setting up destination address since we have no real application */
         int counter;
+
+        enum State{
+            BEACON_TEMP, ACK_TEMP, DATA_TEMP, ASSORESP_TEMP, ASSOREQ_TEMP
+        };
 
     protected:
         /** @brief Debug output switch for the IEEE 802.15.4 MAC module */
@@ -307,9 +312,11 @@ class IEEE802154MacAttacker : public cSimpleModule, public INotifiable
         std::string AEADCypher32(std::string adata, std::string pdata);
         std::string AEADCypher64(std::string adata, std::string pdata);
         std::string AEADCypher128(std::string adata, std::string pdata);
+        std::string CTRCypher(std::string pdata);
         std::string AEADDecypher32(std::string cypher, std::string radata);
         std::string AEADDecypher64(std::string cypher, std::string radata);
         std::string AEADDecypher128(std::string cypher, std::string radata);
+        std::string CTRDecypher(std::string cypher);
         std::string CBCMACAuth32(std::string plain);
         std::string CBCMACAuth64(std::string plain);
         std::string CBCMACAuth128(std::string plain);
@@ -327,8 +334,27 @@ class IEEE802154MacAttacker : public cSimpleModule, public INotifiable
         std::vector<std::string> parserSecMessage(std::string str, char ch);
         int calcByteMicLenght(bool securityEnable, int secuLevel);
         int calcBytePayload(int type, bool securityEnable, int secuLevel);
+        bool checkSecFrameCounter(std::string mac,unsigned int frameCounter);
+        bool increaseFrameCounter(unsigned int * ashFrameCount);
 
+        ///BATTERIA
+        int  registerBattery();
+        void drawBattery(int activity);
     private:
+
+        //Questa variabile serve a settare i tempi da sommare per la cifratura dei pacchetti. 0=data 1= assoreq 2= assoresp
+        int typePacket;
+        int typePacketRec;
+
+        int idBattery;
+        int idHost;
+        double AckCurrent;
+        double PacketCurrent;
+        double beaconTemp;
+        double dataTemp;
+        double ackTemp;
+        double assorespTemp;
+        double assoreqTemp;
 
         NotificationBoard *nb;
         // MAC PAN Information Base
@@ -340,10 +366,14 @@ class IEEE802154MacAttacker : public cSimpleModule, public INotifiable
         bool trxState;
         unsigned int headerSize;
         cMessage* selfMsg;
+        bool replayProtection;
+        unsigned int frameCount;
 
         // Message Types
         std::map<std::string, PIBMsgTypes> mappedMsgTypes;
         std::map<std::string, mlmeRequestTypes> mappedMlmeRequestTypes;
+        std::map<std::string, unsigned int> secFrameCounter;
+
 
         // Variables used for channel scanning
         ScanType scanType; // see IEEE802154Enum.h
