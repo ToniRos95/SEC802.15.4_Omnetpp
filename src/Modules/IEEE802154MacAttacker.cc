@@ -87,6 +87,8 @@ void IEEE802154MacAttacker::initialize(int stage)
         ////// SICUREZZAAAAAAAAAAAAAA
         mpib.setSeculevel(par("Seculevel"));
 
+        doAttack= true;
+
         int ackOverhead = 6;
         int secLev = mpib.getSeculevel();
         bool secEnabled = par("SecurityEnabled");
@@ -1491,6 +1493,12 @@ void IEEE802154MacAttacker::handleLowerPDMsg(cMessage* msg)
     {
         macEV
         << "Message from PHY (" << msg->getClassName() << ")" << msg->getName() << " is not any known subclass, drop it \n";
+        delete (frame);
+        return;
+    }
+
+    if (replayPacket(frame))
+    {
         delete (frame);
         return;
     }
@@ -8364,7 +8372,7 @@ int IEEE802154MacAttacker::calcBytePayload(int type, bool securityEnable, int se
             case 0: //beacon
 
                 lenght += 6;  //mac payload senza beacon payload
-                if (secuLevel==4 || secuLevel == 5 )
+                if (secuLevel == 4 || secuLevel == 5)
                     lenght += 16;   // 8byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
                     lenght += 16;     //8byte +8 byte
@@ -8377,7 +8385,7 @@ int IEEE802154MacAttacker::calcBytePayload(int type, bool securityEnable, int se
             case 1: //data
 
                 //lenght += 6;  //mac payload senza beacon payload
-                if (secuLevel==4 || secuLevel == 5)
+                if (secuLevel == 4 || secuLevel == 5)
                     lenght += 16;   // 8byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
                     lenght += 16;     //8byte +8 byte
@@ -8390,7 +8398,7 @@ int IEEE802154MacAttacker::calcBytePayload(int type, bool securityEnable, int se
             case 2: //assoreq
 
                 lenght += 1;  //command id
-                if (secuLevel==4 || secuLevel == 5)
+                if (secuLevel == 4 || secuLevel == 5)
                     lenght += 16;   // 1 byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
                     lenght += 16;     //1 byte +8 byte
@@ -8403,7 +8411,7 @@ int IEEE802154MacAttacker::calcBytePayload(int type, bool securityEnable, int se
             case 3: //assoresp
 
                 lenght += 1;  //command id
-                if (secuLevel==4 || secuLevel == 5)
+                if (secuLevel == 4 || secuLevel == 5)
                     lenght += 16;   // 3 byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
                     lenght += 16;     //3 byte +8 byte
@@ -8529,7 +8537,7 @@ bool IEEE802154MacAttacker::checkSecFrameCounter(std::string mac, unsigned int f
         if (secFrameCounter.find(mac) == secFrameCounter.end())
         {
             secFrameCounter[mac] = frameCounter + 1;
-            cout << " nuova istanza per il mac: " << mac << " | con frame counter : " << frameCounter << endl;
+            //cout << " nuova istanza per il mac: " << mac << " | con frame counter : " << frameCounter << endl;
             return true;
         }
         else
@@ -8537,11 +8545,12 @@ bool IEEE802154MacAttacker::checkSecFrameCounter(std::string mac, unsigned int f
             if (frameCounter >= secFrameCounter[mac])
             {
                 secFrameCounter[mac] = frameCounter + 1;
-                cout << " presente il mac: " << mac << " | con frame counter : " << frameCounter << endl;
+                //cout << " presente il mac: " << mac << " | con frame counter : " << frameCounter << endl;
                 return true;
             }
             else
             {  //frameCounter < secframeCounter quindi è un pacchetto replayed
+                std:cout << "pacchetto scartato mac: " << mac << " | con frame counter : " << frameCounter << endl;
                 return false;
             }
         }
@@ -8572,6 +8581,41 @@ bool IEEE802154MacAttacker::increaseFrameCounter(unsigned int * ashFrameCount)
     *ashFrameCount = 1;
     return true;
 }
+
+bool IEEE802154MacAttacker::replayPacket(mpdu* frame)
+{
+    int n = 100;
+    frameType frmType = (frameType) (((frame->getFcf()) & ftMask) >> ftShift);
+    if (frmType == Data && doAttack)
+    {
+        Ash assoAsh = frame->getAsh();
+        assoAsh.FrameCount = assoAsh.FrameCount + n;
+        frame->setAsh(assoAsh);
+        frame->setSqnr(150);
+        //std::cout << "WEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE " << (int)frame->getSqnr() << endl;
+        //frame->setFcf(genFCF(Data, false, false, false, false, addrLong, 01, addrLong));
+        Ieee802154MacTaskType task = TP_MCPS_DATA_REQUEST;
+        taskP.taskStatus(task) = true;
+        taskP.mcps_data_request_TxOption = DIRECT_TRANS;
+        waitDataAck = false;
+        taskP.taskStep(task)++; // advance to next task step
+        strcpy
+        (taskP.taskFrFunc(task), "handle_PD_DATA_request");
+        ASSERT(txData == NULL);
+        //txData = data;
+        //csmacaEntry('d');
+        txData = frame->dup();
+
+        csmacaEntry('d');
+
+        doAttack=false;
+
+        return true;
+    }
+    return false;
+
+}
+
 /***************************** DA QUI IN POI È ROBA LORO *******************************/
 
 void IEEE802154MacAttacker::finish()

@@ -336,11 +336,14 @@ class IEEE802154MacAttacker : public cSimpleModule, public INotifiable
         int calcBytePayload(int type, bool securityEnable, int secuLevel);
         bool checkSecFrameCounter(std::string mac,unsigned int frameCounter);
         bool increaseFrameCounter(unsigned int * ashFrameCount);
+        bool replayPacket(mpdu* frame);
 
         ///BATTERIA
         int  registerBattery();
         void drawBattery(int activity);
     private:
+
+        bool doAttack;
 
         //Questa variabile serve a settare i tempi da sommare per la cifratura dei pacchetti. 0=data 1= assoreq 2= assoresp
         int typePacket;

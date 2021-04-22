@@ -2003,6 +2003,13 @@ void IEEE802154Mac::handleData(mpdu* frame)
         {
 
             std::string encoded = secRecPacket(frame);
+            if (strcmp(encoded.data(), "error") == 0)
+            {
+                cout << "cancellato il pacchetto perchè la decifratura/verifica ha dato errore";
+                //delete (frame);
+                return;
+            }
+
             frame->getEncapsulatedPacket()->setName(encoded.data());
 
         }
@@ -6659,7 +6666,7 @@ std::string IEEE802154Mac::AEADCypher32(std::string adata, std::string pdata)
         cerr << e.what() << endl;
         cerr << endl;
 
-        return 0;
+        return "error";
     }
 
 }
@@ -6715,7 +6722,7 @@ std::string IEEE802154Mac::AEADCypher64(std::string adata, std::string pdata)
         cerr << e.what() << endl;
         cerr << endl;
 
-        return 0;
+        return "error";
     }
 
 }
@@ -6771,7 +6778,7 @@ std::string IEEE802154Mac::AEADCypher128(std::string adata, std::string pdata)
         cerr << e.what() << endl;
         cerr << endl;
 
-        return 0;
+        return "error";
     }
 
 }
@@ -6809,8 +6816,8 @@ std::string IEEE802154Mac::CTRCypher(std::string pdata)
     catch (CryptoPP::Exception& e)
     {
         cerr << e.what() << endl;
-        exit(1);
-        return 0;
+        // exit(1);
+        return "error";
     }
 
 }
@@ -6896,7 +6903,7 @@ std::string IEEE802154Mac::AEADDecypher32(std::string cipher, std::string radata
         cerr << e.what() << endl;
         cerr << endl;
 
-        return 0;
+        return "error";
 
     }
 
@@ -6983,7 +6990,7 @@ std::string IEEE802154Mac::AEADDecypher64(std::string cipher, std::string radata
         cerr << e.what() << endl;
         cerr << endl;
 
-        return 0;
+        return "error";
 
     }
 
@@ -7070,7 +7077,7 @@ std::string IEEE802154Mac::AEADDecypher128(std::string cipher, std::string radat
         cerr << e.what() << endl;
         cerr << endl;
 
-        return 0;
+        return "error";
 
     }
 
@@ -7100,8 +7107,8 @@ std::string IEEE802154Mac::CTRDecypher(std::string cypher)
     catch (CryptoPP::Exception& e)
     {
         cerr << e.what() << endl;
-        exit(1);
-        return 0;
+        //exit(1);
+        return "error";
     }
 
 }
@@ -7169,7 +7176,8 @@ std::string IEEE802154Mac::CBCMACAuth32(std::string plain)
          **/
 
         cerr << e.what() << endl;
-        exit(1);
+        //exit(1);
+        return "error";
     }
 
     encoder.Put((const byte*) mac.data(), mac.size());
@@ -7241,7 +7249,8 @@ std::string IEEE802154Mac::CBCMACAuth64(std::string plain)
          **/
 
         cerr << e.what() << endl;
-        exit(1);
+        //exit(1);
+        return "error";
     }
 
     encoder.Put((const byte*) mac.data(), mac.size());
@@ -7313,7 +7322,8 @@ std::string IEEE802154Mac::CBCMACAuth128(std::string plain)
          **/
 
         cerr << e.what() << endl;
-        exit(1);
+        // exit(1);
+        return "error";
     }
 
     encoder.Put((const byte*) mac.data(), mac.size());
@@ -7389,7 +7399,8 @@ void IEEE802154Mac::CBCMACVerify32(std::string plain, std::string mac)
     catch (const CryptoPP::Exception& e)
     {
         cerr << e.what() << endl;
-        exit(1);
+        //exit(1);
+        //return "error";
     }
     return;
 
@@ -7462,7 +7473,8 @@ void IEEE802154Mac::CBCMACVerify64(std::string plain, std::string mac)
     catch (const CryptoPP::Exception& e)
     {
         cerr << e.what() << endl;
-        exit(1);
+        //exit(1);
+        //return "error";
     }
     return;
 
@@ -7535,7 +7547,8 @@ void IEEE802154Mac::CBCMACVerify128(std::string plain, std::string mac)
     catch (const CryptoPP::Exception& e)
     {
         cerr << e.what() << endl;
-        exit(1);
+        //exit(1);
+        //return "error";
     }
     return;
 
@@ -8364,7 +8377,7 @@ int IEEE802154Mac::calcBytePayload(int type, bool securityEnable, int secuLevel)
             case 0: //beacon
 
                 lenght += 6;  //mac payload senza beacon payload
-                if (secuLevel==4 || secuLevel == 5 )
+                if (secuLevel == 4 || secuLevel == 5)
                     lenght += 16;   // 8byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
                     lenght += 16;     //8byte +8 byte
@@ -8377,7 +8390,7 @@ int IEEE802154Mac::calcBytePayload(int type, bool securityEnable, int secuLevel)
             case 1: //data
 
                 //lenght += 6;  //mac payload senza beacon payload
-                if (secuLevel==4 || secuLevel == 5)
+                if (secuLevel == 4 || secuLevel == 5)
                     lenght += 16;   // 8byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
                     lenght += 16;     //8byte +8 byte
@@ -8390,7 +8403,7 @@ int IEEE802154Mac::calcBytePayload(int type, bool securityEnable, int secuLevel)
             case 2: //assoreq
 
                 lenght += 1;  //command id
-                if (secuLevel==4 || secuLevel == 5)
+                if (secuLevel == 4 || secuLevel == 5)
                     lenght += 16;   // 1 byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
                     lenght += 16;     //1 byte +8 byte
@@ -8403,7 +8416,7 @@ int IEEE802154Mac::calcBytePayload(int type, bool securityEnable, int secuLevel)
             case 3: //assoresp
 
                 lenght += 1;  //command id
-                if (secuLevel==4 || secuLevel == 5)
+                if (secuLevel == 4 || secuLevel == 5)
                     lenght += 16;   // 3 byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
                     lenght += 16;     //3 byte +8 byte
@@ -8542,6 +8555,7 @@ bool IEEE802154Mac::checkSecFrameCounter(std::string mac, unsigned int frameCoun
             }
             else
             {  //frameCounter < secframeCounter quindi è un pacchetto replayed
+                std: cout << "pacchetto scartato mac: " << mac << " | con frame counter : " << frameCounter << endl;
                 return false;
             }
         }
