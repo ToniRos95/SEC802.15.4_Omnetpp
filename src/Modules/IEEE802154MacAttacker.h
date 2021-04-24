@@ -344,6 +344,7 @@ class IEEE802154MacAttacker : public cSimpleModule, public INotifiable
     private:
 
         bool doAttack;
+        bool replayAttack;
 
         //Questa variabile serve a settare i tempi da sommare per la cifratura dei pacchetti. 0=data 1= assoreq 2= assoresp
         int typePacket;

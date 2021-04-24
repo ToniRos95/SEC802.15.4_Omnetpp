@@ -87,7 +87,8 @@ void IEEE802154MacAttacker::initialize(int stage)
         ////// SICUREZZAAAAAAAAAAAAAA
         mpib.setSeculevel(par("Seculevel"));
 
-        doAttack= true;
+        doAttack = false;
+        replayAttack = false;
 
         int ackOverhead = 6;
         int secLev = mpib.getSeculevel();
@@ -601,6 +602,7 @@ void IEEE802154MacAttacker::handleUpperMsg(cMessage *msg)
 
             case 1:  // direct CAP ACK
             {
+                doAttack=true;
                 taskP.mcps_data_request_TxOption = DIRECT_TRANS;
                 data->setFcf(genFCF(Data, false, false, true, false, addrLong, 01, addrLong));
                 //data->setByteLength(calcFrameByteLength(data));
@@ -2649,6 +2651,14 @@ void IEEE802154MacAttacker::handle_PD_DATA_confirm(phyState status)
     if (status == phy_SUCCESS)
     {
         dispatch(status, __FUNCTION__);
+        if(doAttack){
+            mpib.setMacSecurityEnabled(false);
+            genACK(128, false);
+            doAttack=false;
+            sendDelayed(txAck->dup(),0.0003, "outPD");
+            //send(txAck->dup(), "outPD");
+        }
+
     }
 // In 802.15.4-2006 and later revisions, BUSY_RX/TX were removed and the PHY should switch to TX_ON regardless of its state
 // so no more phy_BUSY_TX/RX enums and no more handling of PD-DATA.confirm with those states
@@ -4622,7 +4632,7 @@ void IEEE802154MacAttacker::startTxAckBoundTimer(simtime_t wtime)
     {
         cancelEvent(txAckBoundTimer);
     }
-    scheduleAt(simTime() + wtime + ackTemp, txAckBoundTimer);
+    scheduleAt(simTime() + wtime, txAckBoundTimer);
 }
 
 void IEEE802154MacAttacker::startTxCmdDataBoundTimer(simtime_t wtime)
@@ -5487,6 +5497,8 @@ void IEEE802154MacAttacker::handleTxCmdDataBoundTimer()
     {
         txPkt = txData;
         sendDown(check_and_cast<mpdu *>(txData->dup()));
+        //genACK(128, false);
+        //send(txAck->dup(), "outPD");
         return;
     }
 }
@@ -8550,7 +8562,7 @@ bool IEEE802154MacAttacker::checkSecFrameCounter(std::string mac, unsigned int f
             }
             else
             {  //frameCounter < secframeCounter quindi è un pacchetto replayed
-                std:cout << "pacchetto scartato mac: " << mac << " | con frame counter : " << frameCounter << endl;
+                std: cout << "pacchetto scartato mac: " << mac << " | con frame counter : " << frameCounter << endl;
                 return false;
             }
         }
@@ -8586,7 +8598,7 @@ bool IEEE802154MacAttacker::replayPacket(mpdu* frame)
 {
     int n = 100;
     frameType frmType = (frameType) (((frame->getFcf()) & ftMask) >> ftShift);
-    if (frmType == Data && doAttack)
+    if (frmType == Data && doAttack && replayAttack)
     {
         Ash assoAsh = frame->getAsh();
         assoAsh.FrameCount = assoAsh.FrameCount + n;
@@ -8608,9 +8620,19 @@ bool IEEE802154MacAttacker::replayPacket(mpdu* frame)
 
         csmacaEntry('d');
 
-        doAttack=false;
+        doAttack = false;
 
         return true;
+    }
+
+    if (frmType == Data && doAttack && !replayAttack)
+    {
+
+       // genACK(frame->getSqnr(), false);
+       // send(txAck->dup(), "outPD");
+        doAttack = true;
+        return true;
+
     }
     return false;
 

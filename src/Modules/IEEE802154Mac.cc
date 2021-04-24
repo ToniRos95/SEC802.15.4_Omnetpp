@@ -94,11 +94,11 @@ void IEEE802154Mac::initialize(int stage)
         if (secEnabled)
         {
             if (secLev == 1 || secLev == 5)
-                ackOverhead += 4;
-            else if (secLev == 2 || secLev == 6)
                 ackOverhead += 8;
+            else if (secLev == 2 || secLev == 6)
+                ackOverhead += 12;
             else if (secLev == 3 || secLev == 7)
-                ackOverhead += 16;
+                ackOverhead += 20;
         }
 
         // initialize MacDSN (data sequence number) and MacBSN (beacon sequence number) to random 8-bit values
@@ -116,6 +116,7 @@ void IEEE802154Mac::initialize(int stage)
         //mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + ppib.getSHR() + (6 - ppib.getSymbols()));
         ASSERT(getModuleByPath("^.^.PHY") != NULL);// getModuleByPath returns the PHY module here
         mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + (getModuleByPath("^.^.PHY")->par("SHRDuration").longValue()) + (ackOverhead - (getModuleByPath("^.^.PHY")->par("symbolsPerOctet").longValue())));
+
 
         // inizialize PHY-related variables from PHY.ned -> FIXME -> PLME-GET msg should be used
         phy_channel = getModuleByPath("^.^.PHY")->par("currentChannel").longValue();
@@ -1764,7 +1765,7 @@ void IEEE802154Mac::handleBeacon(mpdu *frame)
         //Non siamo sicurissimi che il securityEnabled debba essere preso dall'mpib
         if (mpib.getMacSecurityEnabled())
         {
-
+             drawBattery(IEEE802154Mac::BEACON_TEMP);
             /**
              std::cout << " TESTO DECIFRATO IN HEX" << endl;
              printHex(encoded);
@@ -1780,7 +1781,11 @@ void IEEE802154Mac::handleBeacon(mpdu *frame)
             if (bcnFrame->getAsh().secu.Seculevel == 1 || bcnFrame->getAsh().secu.Seculevel == 2 || bcnFrame->getAsh().secu.Seculevel == 3)
             {
 
-                secRecPacket(bcnFrame);
+                std::string encoded = secRecPacket(bcnFrame);
+                if (strcmp(encoded.data(), "error") == 0)
+                {
+                    return;
+                }
 
                 rxSfSpec = bcnFrame->getSfSpec();
 
@@ -1789,6 +1794,10 @@ void IEEE802154Mac::handleBeacon(mpdu *frame)
             {
 
                 std::string encoded = secRecPacket(bcnFrame);
+                if (strcmp(encoded.data(), "error") == 0)
+                {
+                    return;
+                }
                 /**
                  std::vector<string> result = parserSecMessage(encoded, '\x23');
                  std::vector<string> sfSpec = parserSecMessage(result[0], '\x2a');
@@ -1810,7 +1819,7 @@ void IEEE802154Mac::handleBeacon(mpdu *frame)
 
             //std::cout << "RXSFSPEC  " << endl;
             //std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
-            drawBattery(IEEE802154Mac::BEACON_TEMP);
+
         }
         else
         {
@@ -1915,8 +1924,12 @@ void IEEE802154Mac::handleAck(cMessage* frame)
 
     if (mpib.getMacSecurityEnabled())
     {
-        secRecAck(ack->dup(), mpib.getSeculevel());
+        std::string encoded = secRecAck(ack->dup(), mpib.getSeculevel());
         drawBattery(IEEE802154Mac::ACK_TEMP);
+        if (strcmp(encoded.data(), "error") == 0)
+        {
+            return;
+        }
 
     }
 
@@ -1993,10 +2006,16 @@ void IEEE802154Mac::handleData(mpdu* frame)
          //setAPDATA(&authenticated,&null,bcnFrame, bcnFrame->getName(),false);
          **/
 
+        drawBattery(IEEE802154Mac::DATA_TEMP);
+
         if (frame->getAsh().secu.Seculevel == 1 || frame->getAsh().secu.Seculevel == 2 || frame->getAsh().secu.Seculevel == 3)
         {
 
-            secRecPacket(frame);
+            std::string encoded = secRecPacket(frame);
+            if (strcmp(encoded.data(), "error") == 0)
+            {
+                return;
+            }
 
         }
         else if (frame->getAsh().secu.Seculevel == 4 || frame->getAsh().secu.Seculevel == 5 || frame->getAsh().secu.Seculevel == 6 || frame->getAsh().secu.Seculevel == 7)
@@ -2016,7 +2035,7 @@ void IEEE802154Mac::handleData(mpdu* frame)
 
         //std::cout << "RXSFSPEC  " << endl;
         //std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
-        drawBattery(IEEE802154Mac::DATA_TEMP);
+
     }
 
     rxData = (frame->dup());
@@ -2046,6 +2065,7 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                 {
 
                     typePacketRec = 1;
+                    drawBattery(IEEE802154Mac::ASSOREQ_TEMP);
                     /**
                      std::cout << " TESTO DECIFRATO IN HEX" << endl;
                      printHex(encoded);
@@ -2061,7 +2081,12 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                     if (tmpAssoReq->getAsh().secu.Seculevel == 1 || tmpAssoReq->getAsh().secu.Seculevel == 2 || tmpAssoReq->getAsh().secu.Seculevel == 3)
                     {
 
-                        secRecPacket(tmpAssoReq);
+                        std::string encoded = secRecPacket(tmpAssoReq);
+
+                        if (strcmp(encoded.data(), "error") == 0)
+                        {
+                            return;
+                        }
 
                         assoInd->setCapabilityInformation(tmpAssoReq->getCapabilityInformation());
 
@@ -2070,6 +2095,11 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                     {
 
                         std::string encoded = secRecPacket(tmpAssoReq);
+                        if (strcmp(encoded.data(), "error") == 0)
+                        {
+                            return;
+                        }
+
                         std::vector<string> DevCap = parserSecMessage(encoded, '\x2a');
 
                         DevCapability tempDevCap = { DevCap[9][0] == '\x00' ? false : true, // allpancoor
@@ -2085,7 +2115,6 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                         assoInd->setCapabilityInformation(tempDevCap);
 
                     }
-                    drawBattery(IEEE802154Mac::ASSOREQ_TEMP);
 
                 }
                 else
@@ -2102,8 +2131,8 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                 genAssoResp(Success, tmpAssoReq);
                 // XXX set Transceiver to ON (and thus handle_PLME_SET_TRX_STATE and eventually transfer) ?!?
                 //genSetTrxState(phy_TX_ON);
-                delete (rxCmd); // fix for undisposed object (mpdu)
-                rxCmd = NULL;  // XXX delete command message buffer after processing
+                delete (rxCmd);                    // fix for undisposed object (mpdu)
+                rxCmd = NULL;                    // XXX delete command message buffer after processing
                 delete (tmpAssoReq);
                 return;
 
@@ -2112,7 +2141,7 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
             {
                 macEV << "Device is dropping Association Request frame since we are NOT a coordinator \n";
                 delete (rxCmd); // fix for undisposed object (mpdu)
-                rxCmd = NULL;  // XXX delete command message buffer after processing
+                rxCmd = NULL; // XXX delete command message buffer after processing
                 delete (cmdFrame);
                 return;
             }
@@ -2126,8 +2155,8 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
             {
                 // Discard
                 macEV << "Coordinator got a Associate Response -- dropping it \n";
-                delete (rxCmd); // fix for undisposed object (mpdu)
-                rxCmd = NULL; // XXX delete command message buffer after processing;
+                delete (rxCmd);  // fix for undisposed object (mpdu)
+                rxCmd = NULL;  // XXX delete command message buffer after processing;
                 delete (cmdFrame);
                 return;
             }
@@ -2140,17 +2169,27 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                 {
 
                     typePacketRec = 2;
+                    drawBattery(IEEE802154Mac::ASSORESP_TEMP);
 
                     if (aresp->getAsh().secu.Seculevel == 1 || aresp->getAsh().secu.Seculevel == 2 || aresp->getAsh().secu.Seculevel == 3)
                     {
 
-                        secRecPacket(aresp);
+                        std::string encoded = secRecPacket(aresp);
+
+                        if (strcmp(encoded.data(), "error") == 0)
+                        {
+                            return;
+                        }
 
                     }
                     else if (aresp->getAsh().secu.Seculevel == 4 || aresp->getAsh().secu.Seculevel == 5 || aresp->getAsh().secu.Seculevel == 6 || aresp->getAsh().secu.Seculevel == 7)
                     {
 
                         std::string encoded = secRecPacket(aresp);
+                        if (strcmp(encoded.data(), "error") == 0)
+                        {
+                            return;
+                        }
                         std::vector<string> temp = parserSecMessage(encoded, '\x23');
 
                         unsigned short shortAddress;
@@ -2163,7 +2202,6 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                         aresp->setStatus(status);
 
                     }
-                    drawBattery(IEEE802154Mac::ASSORESP_TEMP);
 
                 }
 
@@ -2191,7 +2229,7 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                 send(assoConf, "outMLME");
 
                 delete (rxCmd); // fix for undisposed object (mpdu)
-                rxCmd = NULL;  // XXX delete command message buffer after processing
+                rxCmd = NULL; // XXX delete command message buffer after processing
                 delete (aresp); // XXX fix for undisposed object (AssoCmdresp)
                 return;
             }
@@ -2215,7 +2253,7 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
             associated = false;
 
             delete (rxCmd); // fix for undisposed object (mpdu)
-            rxCmd = NULL;   // XXX delete command message buffer after processing
+            rxCmd = NULL; // XXX delete command message buffer after processing
             delete (cmdFrame);
             delete (tmpDisCmd);
             break;
@@ -2228,7 +2266,7 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
             // TODO: further processing of DATA_REQUEST command necessary
             //send(cmdFrame, "outMLME");
             delete (rxCmd);
-            rxCmd = NULL;   // XXX delete command message buffer after processing
+            rxCmd = NULL;                // XXX delete command message buffer after processing
             break;
         }  // case Ieee802154_DATA_REQUEST
 
@@ -2375,7 +2413,7 @@ void IEEE802154Mac::handle_PLME_SET_TRX_STATE_confirm(phyState status)
         // although no CSMA-CA is required for the transmission of ACK,
         // but we still need to locate the Backoff period boundary if we are beacon-enabled
         // (refer to 802.15.4-2006 Spec. page 189, Sec, 7.5.6.4.2 Acknowledgment)
-        if ((mpib.getMacBeaconOrder() == 15) && (rxBO == 15)) // non-beacon enabled
+        if ((mpib.getMacBeaconOrder() == 15) && (rxBO == 15))            // non-beacon enabled
         {
             delay = 0.0;
         }
@@ -2625,7 +2663,7 @@ void IEEE802154Mac::handle_PLME_SET_confirm(cMessage* msg)
         }
     } // switch(setConf->getPIBAttr)
 
-    delete (msg);   // XXX fix for undisposed objects (PLME-SET.confirm)
+    delete (msg); // XXX fix for undisposed objects (PLME-SET.confirm)
     return;
 }
 
@@ -2730,7 +2768,7 @@ bool IEEE802154Mac::filter(mpdu* pdu)
         if (frmType == Beacon)
         {
             // check source PAN ID for beacon frame
-            if ((mpib.getMacPANId() != 0xffff)  // associated
+            if ((mpib.getMacPANId() != 0xffff) // associated
             && (pdu->getSrcPANid() != mpib.getMacPANId())) // PAN ID did not match
             {
                 macEV << "Further Filtering for frmType == Beacon & PAN ID did not match --> BEACON packet filtered \n";
@@ -2751,7 +2789,7 @@ bool IEEE802154Mac::filter(mpdu* pdu)
             }
 
             // check destination address
-            if ((addressMode == addrShort))  // short address
+            if ((addressMode == addrShort)) // short address
             {
                 if (!(pdu->getDest().isBroadcast()) && (pdu->getDest().getShortAddr() != mpib.getMacShortAddress()))
                 {
@@ -3092,8 +3130,8 @@ void IEEE802154Mac::genAssoResp(MlmeAssociationStatus status, AssoCmdreq* tmpAss
                     // waiting for GTS arriving, callback from handleGtsTimer()
                     strcpy
                     (taskP.taskFrFunc(task), "handleGtsTimer");
-                    ASSERT(txGTS == NULL); // fix for txGTS segmentation fault (use txGTS instead of txData)
-                    txGTS = holdMe; // fix for txGTS segmentation fault (use txGTS instead of txData)
+                    ASSERT(txGTS == NULL);             // fix for txGTS segmentation fault (use txGTS instead of txData)
+                    txGTS = holdMe;                    // fix for txGTS segmentation fault (use txGTS instead of txData)
                     numGTSRetry = 0;
 
                     // if I'm the PAN coordinator, should defer the transmission until the start of the receive GTS
@@ -3199,8 +3237,8 @@ void IEEE802154Mac::genDisAssoCmd(DisAssociation* disAss, bool direct)
                     // waiting for GTS arriving, callback from handleGtsTimer()
                     strcpy
                     (taskP.taskFrFunc(task), "handleGtsTimer");
-                    ASSERT(txGTS == NULL); // fix for txGTS segmentation fault (use txGTS instead of txData)
-                    txGTS = holdMe; // fix for txGTS segmentation fault (use txGTS instead of txData)
+                    ASSERT(txGTS == NULL);             // fix for txGTS segmentation fault (use txGTS instead of txData)
+                    txGTS = holdMe;                    // fix for txGTS segmentation fault (use txGTS instead of txData)
                     numGTSRetry = 0;
 
                     // If I'm the PAN coordinator, should defer the transmission until the start of the receive GTS
@@ -3237,7 +3275,7 @@ unsigned short IEEE802154Mac::calcFCS(mpdu* pdu, cMessage *payload, bool calcFla
     macEV << payload->getControlInfo() << endl;
     int end = 0;
 
-    int x = pdu->getByteLength() - 1;  // Byte length of Payload + Header
+    int x = pdu->getByteLength() - 1; // Byte length of Payload + Header
 //  int y = traffic->getByteLength() - 1;
     int polynomial = 0x1021;
     unsigned char *ptr;
@@ -3387,10 +3425,10 @@ void IEEE802154Mac::genOrphanInd()
     holdMe->setIsGTS(false);
     unsigned char sqnr = mpib.getMacDSN();
     holdMe->setSqnr(sqnr);
-    (sqnr < 255) ? sqnr++ : sqnr = 0; // check if 8-bit data sequence number needs to roll over
+    (sqnr < 255) ? sqnr++ : sqnr = 0;  // check if 8-bit data sequence number needs to roll over
     mpib.setMacDSN(sqnr);
 
-    taskP.taskStep(task)++; // advance to next task step
+    taskP.taskStep(task)++;  // advance to next task step
     strcpy
     (taskP.taskFrFunc(task), "handle_PD_DATA_request");
     ASSERT(txData == NULL);
@@ -3511,7 +3549,7 @@ void IEEE802154Mac::doScan()
                 Ieee802154MacTaskType task = TP_MCPS_DATA_REQUEST;
                 taskP.taskStatus(task) = true;
                 taskP.mcps_data_request_TxOption = DIRECT_TRANS;
-                taskP.taskStep(task)++; // advance to next task step
+                taskP.taskStep(task)++;  // advance to next task step
                 strcpy
                 (taskP.taskFrFunc(task), "handle_PD_DATA_request");
                 csmacaEntry('c');
@@ -3765,7 +3803,7 @@ void IEEE802154Mac::csmacaEntry(char pktType)
     {
         waitBcnCmdUpperAck = false;  // command packet not yet transmitted
         numBcnCmdUpperRetry = 0;
-        if ((backoffStatus == 99) && (txCsmaca != txBcnCmd)) // backoff for data packet
+        if ((backoffStatus == 99) && (txCsmaca != txBcnCmd))  // backoff for data packet
         {
             backoffStatus = 0;
             csmacaCancel();
@@ -3797,7 +3835,7 @@ void IEEE802154Mac::csmacaResume()
         {
             backoffStatus = 99; // is backing off
             strcpy(taskP.taskFrFunc(TP_MCPS_DATA_REQUEST), "csmacaCallBack"); // the transmission may be interrupted and need to backoff again
-            taskP.taskStep(TP_MCPS_DATA_REQUEST) = 1;  // also set the step
+            taskP.taskStep(TP_MCPS_DATA_REQUEST) = 1; // also set the step
             // look up at bit 10 if it is set
             ackReq = ((txBcnCmd->getFcf() & arequMask) >> arequShift);
             txCsmaca = txBcnCmd;
@@ -3808,7 +3846,7 @@ void IEEE802154Mac::csmacaResume()
         else if ((txBcnCmdUpper) && (!waitBcnCmdUpperAck))
         {
             strcpy(taskP.taskFrFunc(TP_MCPS_DATA_REQUEST), "csmacaCallBack"); // the transmission may be interrupted and need to backoff again
-            taskP.taskStep(TP_MCPS_DATA_REQUEST) = 1;  // also set the step
+            taskP.taskStep(TP_MCPS_DATA_REQUEST) = 1; // also set the step
             backoffStatus = 99;
             ackReq = ((txBcnCmdUpper->getFcf() & arequMask) >> arequShift);
             txCsmaca = txBcnCmdUpper;
@@ -3819,7 +3857,7 @@ void IEEE802154Mac::csmacaResume()
         else if ((txData) && (!waitDataAck))
         {
             strcpy(taskP.taskFrFunc(TP_MCPS_DATA_REQUEST), "csmacaCallBack"); // the transmission may be interrupted and need to backoff again
-            taskP.taskStep(TP_MCPS_DATA_REQUEST) = 1;  // also set the step
+            taskP.taskStep(TP_MCPS_DATA_REQUEST) = 1; // also set the step
             backoffStatus = 99;
             ackReq = ((txData->getFcf() & arequMask) >> arequShift);
             txCsmaca = txData;
@@ -3947,7 +3985,7 @@ simtime_t IEEE802154Mac::csmacaAdjustTime(simtime_t wtime)
     simtime_t tmpf;
 
     ASSERT(tmpCsmaca != NULL);
-    if (!toParent(tmpCsmaca))  // as a coordinator
+    if (!toParent(tmpCsmaca)) // as a coordinator
     {
         if (mpib.getMacBeaconOrder() != 15)
         {
@@ -4067,7 +4105,7 @@ bool IEEE802154Mac::csmacaCanProceed(simtime_t wtime, bool afterCCA)
 // check 3: if the entire transmission can be finished before the end of current CAP
 
     macEV << "[CSMA]: Starting to evaluate whether CSMA-CA can proceed ... \n";
-    if (!toParent(tmpCsmaca))  // as a coordinator
+    if (!toParent(tmpCsmaca))            // as a coordinator
     {
         if (mpib.getMacBeaconOrder() != 15)  // beacon enabled as a coordinator
         {
@@ -4103,12 +4141,12 @@ bool IEEE802154Mac::csmacaCanProceed(simtime_t wtime, bool afterCCA)
                 {
                     //t_bPeriods++;
                     // calculate the difference
-                    bPeriodsLeft = t_bPeriods.dbl() + 1 - t_CAP; // backoff periods left for next superframe
+                    bPeriodsLeft = t_bPeriods.dbl() + 1 - t_CAP;             // backoff periods left for next superframe
                 }
                 else
                 {
                     // calculate the difference
-                    bPeriodsLeft = t_bPeriods.dbl() - t_CAP; // backoff periods left for next superframe
+                    bPeriodsLeft = t_bPeriods.dbl() - t_CAP;                 // backoff periods left for next superframe
                 }
             }
         }
@@ -4165,7 +4203,7 @@ bool IEEE802154Mac::csmacaCanProceed(simtime_t wtime, bool afterCCA)
                 if (fmod(tmpf, bPeriod) > 0.0)
                 {
                     //t_bPeriods++;
-                    bPeriodsLeft = t_bPeriods.dbl() + 1 - t_CAP; // backoff periods left for next superframe
+                    bPeriodsLeft = t_bPeriods.dbl() + 1 - t_CAP;  // backoff periods left for next superframe
                 }
                 else
                 {
@@ -4230,7 +4268,7 @@ bool IEEE802154Mac::csmacaCanProceed(simtime_t wtime, bool afterCCA)
     t_transacTime += csmacaLocateBoundary(toParent(tmpCsmaca), t_transacTime) - (t_transacTime); // locate boundary for transmission
     t_transacTime += calcDuration(tmpCsmaca); // calculate packet transmission time
 
-    if (csmacaAckReq)  // if ACK required
+    if (csmacaAckReq) // if ACK required
     {
         t_transacTime += mpib.getMacAckWaitDuration() / phy_symbolrate; // ACK waiting time (this value does not include round trip propagation delay)
         //t_transacTime += 2*max_pDelay;    // FIXME round trip propagation delay (802.15.4 ignores this, but it should be there even though it is very small)
@@ -4240,14 +4278,14 @@ bool IEEE802154Mac::csmacaCanProceed(simtime_t wtime, bool afterCCA)
     {
         t_transacTime += aTurnaroundTime / phy_symbolrate; // transceiver turn-around time (receiver may need to do this to transmit next beacon)
         //t_transacTime += max_pDelay;      // FIXME one-way trip propagation delay (802.15.4 ignores this, but it should be there even though it is very small)
-        t_transacTime += t_IFS; // IFS time -- ensure that both Sender and(!) Receiver can finish the transaction
+        t_transacTime += t_IFS;        // IFS time -- ensure that both Sender and(!) Receiver can finish the transaction
     }
 
     tmpf = now + wtime;
     tmpf += t_transacTime;
     macEV << "[CSMA]: The entire transmission is estimated to finish at " << tmpf << " sec \n";
 // calculate the time for the end of CAP
-    if (!toParent(tmpCsmaca))  // sent as a coordinator
+    if (!toParent(tmpCsmaca))            // sent as a coordinator
     {
         if (mpib.getMacBeaconOrder() != 15) // sent in beacon-enabled, check the end of TX CAP
         {
@@ -4721,7 +4759,7 @@ unsigned char IEEE802154Mac::calcFrameByteLength(cPacket* frame)
 {
     macEV << "Calculating size of " << frame->getName() << endl;
     unsigned char byteLength;   // to calculate -> MHR + MAC payload + MFR (FCS)
-    unsigned char MHRLength;    // to calculate MHR
+    unsigned char MHRLength;   // to calculate MHR
     bool secEn = par("SecurityEnabled").boolValue();
 
     if (dynamic_cast<AckFrame*>(frame))
@@ -4861,7 +4899,7 @@ unsigned char IEEE802154Mac::calcFrameByteLength(cPacket* frame)
     {
         // TODO actually different types and sizes for request, confirm, indication
         // need to be extended and checked again
-        byteLength = 16;    // 16 Bytes for request
+        byteLength = 16;            // 16 Bytes for request
     }
     else if (dynamic_cast<AssociationConfirm*>(frame))
     {
@@ -4926,7 +4964,7 @@ unsigned char IEEE802154Mac::calcMacHeaderByteLength(unsigned char addrModeSum, 
     return 0;
 }
 
-simtime_t IEEE802154Mac::calcDuration(cPacket* frame)
+simtime_t IEEE802154Mac::calcDuration(cPacket * frame)
 {
     return (phyHeaderLength * 8 + frame->getByteLength() * 8) / phy_bitrate;
 }
@@ -5043,11 +5081,11 @@ void IEEE802154Mac::handleBcnTxTimer()
 
             unsigned char bseqn = mpib.getMacBSN();
             tmpBcn->setSqnr(bseqn);
-            (bseqn < 255) ? bseqn++ : bseqn = 0; //  check if beacon sequence number needs to roll over
+            (bseqn < 255) ? bseqn++ : bseqn = 0;                //  check if beacon sequence number needs to roll over
             mpib.setMacBSN(bseqn);
             tmpBcn->setSrc(myMacAddr);
-            tmpBcn->setDestPANid(0xffff);  // ignored upon reception
-            tmpBcn->setDest(MACAddressExt::BROADCAST_ADDRESS); // ignored upon reception
+            tmpBcn->setDestPANid(0xffff);                // ignored upon reception
+            tmpBcn->setDest(MACAddressExt::BROADCAST_ADDRESS);                // ignored upon reception
             tmpBcn->setSrcPANid(mpib.getMacPANId());
 
             // construct superframe specification
@@ -5412,13 +5450,13 @@ void IEEE802154Mac::handleBcnTxTimer()
 
             txBeacon = tmpBcn; // released in taskSuccess or in PD_DATA_confirm (if TX failure)
             txPkt = tmpBcn;
-            mpib.setMacBeaconTxTime(simTime());  // no delay
-            inTransmission = true;  // cleared by PD_DATA_confirm
+            mpib.setMacBeaconTxTime(simTime()); // no delay
+            inTransmission = true; // cleared by PD_DATA_confirm
             if (mpib.getMacSecurityEnabled())
             {
 
                 //std::cout << "WEEEEEEEEEEEEEEEEEEEEEE " << beaconTemp << endl;
-                sendDelayed(txBeacon->dup(), beaconTemp, "outPD");  // send a duplication
+                sendDelayed(txBeacon->dup(), beaconTemp, "outPD"); // send a duplication
                 //send(txBeacon->dup(), "outPD");  // send a duplication
 
             }
@@ -5614,7 +5652,7 @@ void IEEE802154Mac::handleGtsTimer()
                 // hand over to FSM, which will go to next step
                 // no need to call gtsCanProceed() at this time, timing is already guaranteed when allocating GTS
                 macEV << "[GTS]: Data pending for this GTS found in the buffer, starting GTS transmission now \n";
-                FSM_MCPS_DATA_request();         // state parameters are ignored
+                FSM_MCPS_DATA_request();                    // state parameters are ignored
             }
             else    // turn off radio
             {
@@ -5654,7 +5692,7 @@ void IEEE802154Mac::handleGtsTimer()
                     // hand over to FSM, which will go to next step
                     // no need to call gtsCanProceed() at this time, timing is already guaranteed when applying for GTS
                     macEV << "[GTS]: a data is pending for this GTS in the buffer, starting GTS transmission now \n";
-                    FSM_MCPS_DATA_request();     // state parameters are ignored
+                    FSM_MCPS_DATA_request();                        // state parameters are ignored
                 }
                 else
                 {
@@ -5867,7 +5905,7 @@ void IEEE802154Mac::taskSuccess(char type, bool csmacaRes)
         macEV << "taskSuccess for sending : " << txData->getName() << ":#" << (unsigned int) txData->getSqnr() << endl;
         //Packet *p = txData;
         //sendMCPSDataConf(mac_SUCCESS, txData->getId());   // do not send the OMNeT message ID as the msdu handle as it gets larger than unsigned char
-        sendMCPSDataConf(mac_SUCCESS, txData->getSqnr()); // reply with the sequence number
+        sendMCPSDataConf(mac_SUCCESS, txData->getSqnr());            // reply with the sequence number
         delete txData;
         txData = NULL;
         numTxDataSucc++;
@@ -5899,7 +5937,7 @@ void IEEE802154Mac::taskSuccess(char type, bool csmacaRes)
                         strcpy
                         (taskP.taskFrFunc(task), "handleGtsTimer");
                         ASSERT(txGTS == NULL);
-                        txGTS = check_and_cast<mpdu*>(txBuffer.pop()); // pop and cast message from txBuffer as MPDU
+                        txGTS = check_and_cast<mpdu*>(txBuffer.pop());     // pop and cast message from txBuffer as MPDU
                         numGTSRetry = 0;
 
                         // If I'm the PAN coordinator, should defer the transmission until the start of the receive GTS
@@ -5945,7 +5983,7 @@ void IEEE802154Mac::taskSuccess(char type, bool csmacaRes)
             gtsList[indexCurrGts].isTxPending = false;
         }
         //sendMCPSDataConf(mac_SUCCESS, txGTS->getId());   // do not send the OMNeT message ID as the msdu handle as it gets larger than unsigned char
-        sendMCPSDataConf(mac_SUCCESS, txGTS->getSqnr()); // reply with the sequence number
+        sendMCPSDataConf(mac_SUCCESS, txGTS->getSqnr());  // reply with the sequence number
         delete txGTS;
         txGTS = NULL;
         numTxGTSSucc++;
@@ -5978,7 +6016,7 @@ void IEEE802154Mac::taskSuccess(char type, bool csmacaRes)
                         strcpy
                         (taskP.taskFrFunc(task), "handleGtsTimer");
                         ASSERT(txGTS == NULL);
-                        txGTS = check_and_cast<mpdu*>(txBuffer.pop()); // pop and cast message from txBuffer as MPDU
+                        txGTS = check_and_cast<mpdu*>(txBuffer.pop());     // pop and cast message from txBuffer as MPDU
                         numGTSRetry = 0;
 
                         // If I'm the PAN coordinator, should defer the transmission until the start of the receive GTS
@@ -6023,7 +6061,7 @@ void IEEE802154Mac::taskSuccess(char type, bool csmacaRes)
 void IEEE802154Mac::taskFailed(char type, MACenum status, bool csmacaRes)
 {
     if ((type == 'b') // Beacon
-    || (type == 'a')  // ACK
+    || (type == 'a') // ACK
     || (type == 'c')) // Command
     {
         ASSERT(0);  // We don't handle the above failures here
@@ -6038,7 +6076,7 @@ void IEEE802154Mac::taskFailed(char type, MACenum status, bool csmacaRes)
         ASSERT(txData);
         macEV << "taskFailed for sending : " << txData->getName() << ":#" << (unsigned int) txData->getSqnr() << endl;
         //sendMCPSDataConf(status, txData->getId());   // do not send the OMNeT message ID as the msdu handle as it gets larger than unsigned char
-        sendMCPSDataConf(status, txData->getSqnr()); // reply with the sequence number
+        sendMCPSDataConf(status, txData->getSqnr());  // reply with the sequence number
         delete txData;
         txData = NULL;
         numTxDataFail++;
@@ -6075,7 +6113,7 @@ void IEEE802154Mac::taskFailed(char type, MACenum status, bool csmacaRes)
                         strcpy
                         (taskP.taskFrFunc(task), "handleGtsTimer");
                         ASSERT(txGTS == NULL);
-                        txGTS = check_and_cast<mpdu*>(txBuffer.pop()); // pop and cast message from txBuffer as MPDU
+                        txGTS = check_and_cast<mpdu*>(txBuffer.pop());     // pop and cast message from txBuffer as MPDU
                         numGTSRetry = 0;
 
                         // if I'm the PAN coordinator, should defer the transmission until the start of the receive GTS
@@ -6117,7 +6155,7 @@ void IEEE802154Mac::taskFailed(char type, MACenum status, bool csmacaRes)
             gtsList[indexCurrGts].isTxPending = false;
         }
         //sendMCPSDataConf(status, txGTS->getId());     // do not send the OMNeT message ID as the msdu handle as it gets larger than unsigned char
-        sendMCPSDataConf(status, txGTS->getSqnr()); // reply with the sequence number
+        sendMCPSDataConf(status, txGTS->getSqnr());  // reply with the sequence number
 
         delete txGTS;
         txGTS = NULL;
@@ -6151,7 +6189,7 @@ void IEEE802154Mac::taskFailed(char type, MACenum status, bool csmacaRes)
                         strcpy
                         (taskP.taskFrFunc(task), "handleGtsTimer");
                         ASSERT(txGTS == NULL);
-                        txGTS = check_and_cast<mpdu*>(txBuffer.pop()); // pop and cast message from txBuffer as MPDU
+                        txGTS = check_and_cast<mpdu*>(txBuffer.pop());     // pop and cast message from txBuffer as MPDU
                         numGTSRetry = 0;
 
                         // if I'm the PAN coordinator, should defer the transmission until the start of the receive GTS
@@ -6320,7 +6358,7 @@ void IEEE802154Mac::FSM_MCPS_DATA_request(phyState pStatus, MACenum mStatus)
             case 1: {
                 // two possible callbacks, one from handleGtsTimer() at the starting of one GTS
                 // the other directly from MCPS_DATA_request(), only possible for devices when receiving a data from upper layer during the GTS
-                taskP.taskStep(task)++; // advance to next task step
+                taskP.taskStep(task)++;                    // advance to next task step
                 strcpy
                 (taskP.taskFrFunc(task), "handle_PD_DATA_confirm");
                 // should transmit right now, since the timing is very strictly controlled in GTS,
@@ -6368,7 +6406,7 @@ void IEEE802154Mac::FSM_MCPS_DATA_request(phyState pStatus, MACenum mStatus)
                     macEV << "[GTS]: need to delay IFS before next GTS transmission can proceed \n";
                     taskP.taskStep(task)++; // advance to next task step
                     cancelEvent
-                    (ackTimeoutTimer);   // cancel the ACK timeout timer here
+                    (ackTimeoutTimer); // cancel the ACK timeout timer here
                     strcpy(taskP.taskFrFunc(task), "handleIfsTimer");
 
                     (txGTS->getByteLength() <= aMaxSIFSFrameSize) ? startIfsTimer(SIFS) : startIfsTimer(LIFS);
@@ -7332,7 +7370,7 @@ std::string IEEE802154Mac::CBCMACAuth128(std::string plain)
 
 }
 
-void IEEE802154Mac::CBCMACVerify32(std::string plain, std::string mac)
+std::string IEEE802154Mac::CBCMACVerify32(std::string plain, std::string mac)
 {
 
     byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
@@ -7401,12 +7439,13 @@ void IEEE802154Mac::CBCMACVerify32(std::string plain, std::string mac)
         cerr << e.what() << endl;
         //exit(1);
         //return "error";
+        return "error";
     }
-    return;
+    return "true";
 
 }
 
-void IEEE802154Mac::CBCMACVerify64(std::string plain, std::string mac)
+std::string IEEE802154Mac::CBCMACVerify64(std::string plain, std::string mac)
 {
 
     byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
@@ -7475,12 +7514,13 @@ void IEEE802154Mac::CBCMACVerify64(std::string plain, std::string mac)
         cerr << e.what() << endl;
         //exit(1);
         //return "error";
+        return "error";
     }
-    return;
+    return "true";
 
 }
 
-void IEEE802154Mac::CBCMACVerify128(std::string plain, std::string mac)
+std::string IEEE802154Mac::CBCMACVerify128(std::string plain, std::string mac)
 {
 
     byte key[] = { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f };
@@ -7549,8 +7589,9 @@ void IEEE802154Mac::CBCMACVerify128(std::string plain, std::string mac)
         cerr << e.what() << endl;
         //exit(1);
         //return "error";
+        return "error";
     }
-    return;
+    return "true";
 
 }
 
@@ -8008,7 +8049,7 @@ void IEEE802154Mac::setADATAck(std::string *adata, AckFrame* ack)
 
 }
 
-std::string IEEE802154Mac::secPacket(mpdu *frame)
+std::string IEEE802154Mac::secPacket(mpdu * frame)
 {
 
     /**adata è la parte di messaggio che viene mandata in chiaro e deve essere autenticata
@@ -8079,7 +8120,7 @@ std::string IEEE802154Mac::secPacket(mpdu *frame)
 
 }
 
-std::string IEEE802154Mac::secRecPacket(mpdu *frame)
+std::string IEEE802154Mac::secRecPacket(mpdu * frame)
 {
 
     std::string radata;
@@ -8097,20 +8138,20 @@ std::string IEEE802154Mac::secRecPacket(mpdu *frame)
             setADATA(&radata, frame);
             decoder.Put((const byte *) frame->getMic(), 8);
             //std::cout << temp.str();
-            CBCMACVerify32(radata, temp.str());
+            decipherT = CBCMACVerify32(radata, temp.str());
 
             break;
         case 2:
             setADATA(&radata, frame);
             decoder.Put((const byte *) frame->getMic(), 16);
             //std::cout << temp.str();
-            CBCMACVerify64(radata, temp.str());
+            decipherT = CBCMACVerify64(radata, temp.str());
             break;
         case 3:
             setADATA(&radata, frame);
             decoder.Put((const byte *) frame->getMic(), 32);
             //std::cout << temp.str();
-            CBCMACVerify128(radata, temp.str());
+            decipherT = CBCMACVerify128(radata, temp.str());
             break;
         case 4:
             //setAPDATA(&radata, &rpdata, frame, true);
@@ -8156,6 +8197,9 @@ std::string IEEE802154Mac::secRecPacket(mpdu *frame)
      std::cout << endl << endl;
      */
 
+    if(strcmp(decipherT.data(), "error") == 0){
+        std: cout << "pacchetto scartato perchè non corretto \n";
+    }
     return decipherT;
 
 }
@@ -8203,7 +8247,7 @@ std::string IEEE802154Mac::secAck(AckFrame* ack, int secuLevel)
     return result;
 }
 
-void IEEE802154Mac::secRecAck(AckFrame* ack, int secuLevel)
+std::string IEEE802154Mac::secRecAck(AckFrame* ack, int secuLevel)
 {
     std::string radata;
     std::string decipherT;
@@ -8217,19 +8261,19 @@ void IEEE802154Mac::secRecAck(AckFrame* ack, int secuLevel)
             setADATAck(&radata, ack);
             decoder.Put((const byte *) ack->getMic(), 8);
             //std::cout << temp.str();
-            CBCMACVerify32(radata, temp.str());
+            decipherT = CBCMACVerify32(radata, temp.str());
             break;
         case 2:
             setADATAck(&radata, ack);
             decoder.Put((const byte *) ack->getMic(), 16);
             //std::cout << temp.str();
-            CBCMACVerify64(radata, temp.str());
+            decipherT = CBCMACVerify64(radata, temp.str());
             break;
         case 3:
             setADATAck(&radata, ack);
             decoder.Put((const byte *) ack->getMic(), 32);
             //std::cout << temp.str();
-            CBCMACVerify128(radata, temp.str());
+            decipherT = CBCMACVerify128(radata, temp.str());
             break;
         case 4:
             break;
@@ -8237,25 +8281,30 @@ void IEEE802154Mac::secRecAck(AckFrame* ack, int secuLevel)
             setADATAck(&radata, ack);
             decoder.Put((const byte *) ack->getMic(), 8);
             //std::cout << temp.str();
-            CBCMACVerify32(radata, temp.str());
+            decipherT = CBCMACVerify32(radata, temp.str());
             break;
         case 6:
             setADATAck(&radata, ack);
             decoder.Put((const byte *) ack->getMic(), 16);
             //std::cout << temp.str();
-            CBCMACVerify64(radata, temp.str());
+            decipherT = CBCMACVerify64(radata, temp.str());
             break;
         case 7:
             setADATAck(&radata, ack);
             decoder.Put((const byte *) ack->getMic(), 32);
             //std::cout << temp.str();
-            CBCMACVerify128(radata, temp.str());
+            decipherT = CBCMACVerify128(radata, temp.str());
             break;
         default:
             std::cout << "secuLevel : " << secuLevel << endl;
             throw cRuntimeError("secuLevel error");
     }
 
+    if(strcmp(decipherT.data(), "error") == 0){
+        std: cout << "ack scartato perchè non corretto \n";
+    }
+
+    return decipherT;
 }
 
 void IEEE802154Mac::printHex(std::string text)
@@ -8376,13 +8425,13 @@ int IEEE802154Mac::calcBytePayload(int type, bool securityEnable, int secuLevel)
         {
             case 0: //beacon
 
-                lenght += 6;  //mac payload senza beacon payload
+                lenght += 6; //mac payload senza beacon payload
                 if (secuLevel == 4 || secuLevel == 5)
-                    lenght += 16;   // 8byte +4 byte e arriva a 16;
+                    lenght += 16; // 8byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
-                    lenght += 16;     //8byte +8 byte
+                    lenght += 16; //8byte +8 byte
                 else if (secuLevel == 7)
-                    lenght += 32;     //8 byte + 16 e si arrotonda a 32;
+                    lenght += 32; //8 byte + 16 e si arrotonda a 32;
                 else
                     lenght += 8;
                 break;
@@ -8391,37 +8440,37 @@ int IEEE802154Mac::calcBytePayload(int type, bool securityEnable, int secuLevel)
 
                 //lenght += 6;  //mac payload senza beacon payload
                 if (secuLevel == 4 || secuLevel == 5)
-                    lenght += 16;   // 8byte +4 byte e arriva a 16;
+                    lenght += 16; // 8byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
-                    lenght += 16;     //8byte +8 byte
+                    lenght += 16; //8byte +8 byte
                 else if (secuLevel == 7)
-                    lenght += 32;     //8 byte + 16 e si arrotonda a 32;
+                    lenght += 32; //8 byte + 16 e si arrotonda a 32;
                 else
                     lenght += 8;
                 break;
 
             case 2: //assoreq
 
-                lenght += 1;  //command id
+                lenght += 1; //command id
                 if (secuLevel == 4 || secuLevel == 5)
-                    lenght += 16;   // 1 byte +4 byte e arriva a 16;
+                    lenght += 16; // 1 byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
-                    lenght += 16;     //1 byte +8 byte
+                    lenght += 16; //1 byte +8 byte
                 else if (secuLevel == 7)
-                    lenght += 32;     //1 byte + 16 e si arrotonda a 32;
+                    lenght += 32; //1 byte + 16 e si arrotonda a 32;
                 else
                     lenght += 1;
                 break;
 
             case 3: //assoresp
 
-                lenght += 1;  //command id
+                lenght += 1; //command id
                 if (secuLevel == 4 || secuLevel == 5)
-                    lenght += 16;   // 3 byte +4 byte e arriva a 16;
+                    lenght += 16; // 3 byte +4 byte e arriva a 16;
                 else if (secuLevel == 6)
-                    lenght += 16;     //3 byte +8 byte
+                    lenght += 16; //3 byte +8 byte
                 else if (secuLevel == 7)
-                    lenght += 32;     //3 byte + 16 e si arrotonda a 32;
+                    lenght += 32; //3 byte + 16 e si arrotonda a 32;
                 else
                     lenght += 3;
                 break;
@@ -8436,25 +8485,25 @@ int IEEE802154Mac::calcBytePayload(int type, bool securityEnable, int secuLevel)
         {
             case 0: //beacon
 
-                lenght += 6;  //mac payload senza beacon payload
-                lenght += 8;  //beacon payload
+                lenght += 6; //mac payload senza beacon payload
+                lenght += 8; //beacon payload
                 break;
 
             case 1: //data
 
-                lenght += 8;  //data payload
+                lenght += 8; //data payload
                 break;
 
             case 2: //assoreq
 
-                lenght += 1;  //command id
-                lenght += 1;  //content
+                lenght += 1; //command id
+                lenght += 1; //content
                 break;
 
             case 3: //assoresp
 
-                lenght += 1;  //command id
-                lenght += 3;   //content
+                lenght += 1; //command id
+                lenght += 3; //content
                 break;
 
         }
@@ -8542,7 +8591,7 @@ bool IEEE802154Mac::checkSecFrameCounter(std::string mac, unsigned int frameCoun
         if (secFrameCounter.find(mac) == secFrameCounter.end())
         {
             secFrameCounter[mac] = frameCounter + 1;
-            cout << " nuova istanza per il mac: " << mac << " | con frame counter : " << frameCounter << endl;
+           // cout << " nuova istanza per il mac: " << mac << " | con frame counter : " << frameCounter << endl;
             return true;
         }
         else
@@ -8550,7 +8599,7 @@ bool IEEE802154Mac::checkSecFrameCounter(std::string mac, unsigned int frameCoun
             if (frameCounter >= secFrameCounter[mac])
             {
                 secFrameCounter[mac] = frameCounter + 1;
-                cout << " presente il mac: " << mac << " | con frame counter : " << frameCounter << endl;
+                //cout << " presente il mac: " << mac << " | con frame counter : " << frameCounter << endl;
                 return true;
             }
             else
@@ -8579,7 +8628,7 @@ bool IEEE802154Mac::increaseFrameCounter(unsigned int * ashFrameCount)
         }
         *ashFrameCount = frameCount;
         frameCount++;
-        cout << " incremento del frameCounter per il mac: " << this->myMacAddr << " | con frame counter : " << frameCount << endl;
+        //cout << " incremento del frameCounter per il mac: " << this->myMacAddr << " | con frame counter : " << frameCount << endl;
         return true;
     }
 
