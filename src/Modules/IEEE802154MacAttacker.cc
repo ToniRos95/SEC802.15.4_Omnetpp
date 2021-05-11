@@ -88,7 +88,8 @@ void IEEE802154MacAttacker::initialize(int stage)
         mpib.setSeculevel(par("Seculevel"));
 
         doAttack = false;
-        replayAttack = false;
+        replayAttack = true;
+
 
         int ackOverhead = 6;
         int secLev = mpib.getSeculevel();
@@ -2651,7 +2652,7 @@ void IEEE802154MacAttacker::handle_PD_DATA_confirm(phyState status)
     if (status == phy_SUCCESS)
     {
         dispatch(status, __FUNCTION__);
-        if(doAttack){
+        if(doAttack && !replayAttack){
             mpib.setMacSecurityEnabled(false);
             genACK(128, false);
             doAttack=false;
@@ -8630,7 +8631,7 @@ bool IEEE802154MacAttacker::replayPacket(mpdu* frame)
 
        // genACK(frame->getSqnr(), false);
        // send(txAck->dup(), "outPD");
-        doAttack = true;
+        //doAttack = true;
         return true;
 
     }

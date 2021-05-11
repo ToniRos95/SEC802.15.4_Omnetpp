@@ -335,6 +335,7 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         int calcBytePayload(int type, bool securityEnable, int secuLevel);
         bool checkSecFrameCounter(std::string mac,unsigned int frameCounter);
         bool increaseFrameCounter(unsigned int * ashFrameCount);
+        void setSecFrameCounter(std::string mac, unsigned int frameCounter);
 
         ///BATTERIA
         int  registerBattery();
@@ -344,6 +345,8 @@ class IEEE802154Mac : public cSimpleModule, public INotifiable
         //Questa variabile serve a settare i tempi da sommare per la cifratura dei pacchetti. 0=data 1= assoreq 2= assoresp
         int typePacket;
         int typePacketRec;
+
+        bool boolError;
 
         int idBattery;
         int idHost;

@@ -94,11 +94,11 @@ void IEEE802154Mac::initialize(int stage)
         if (secEnabled)
         {
             if (secLev == 1 || secLev == 5)
-                ackOverhead += 8;
+                ackOverhead += 50;
             else if (secLev == 2 || secLev == 6)
-                ackOverhead += 12;
+                ackOverhead += 50;
             else if (secLev == 3 || secLev == 7)
-                ackOverhead += 20;
+                ackOverhead += 50;
         }
 
         // initialize MacDSN (data sequence number) and MacBSN (beacon sequence number) to random 8-bit values
@@ -116,7 +116,6 @@ void IEEE802154Mac::initialize(int stage)
         //mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + ppib.getSHR() + (6 - ppib.getSymbols()));
         ASSERT(getModuleByPath("^.^.PHY") != NULL);// getModuleByPath returns the PHY module here
         mpib.setMacAckWaitDuration(aUnitBackoffPeriod + aTurnaroundTime + (getModuleByPath("^.^.PHY")->par("SHRDuration").longValue()) + (ackOverhead - (getModuleByPath("^.^.PHY")->par("symbolsPerOctet").longValue())));
-
 
         // inizialize PHY-related variables from PHY.ned -> FIXME -> PLME-GET msg should be used
         phy_channel = getModuleByPath("^.^.PHY")->par("currentChannel").longValue();
@@ -251,7 +250,9 @@ void IEEE802154Mac::initialize(int stage)
         capability.alterPANCoor = false;
         capability.FFD = true;
         //capability.mainsPower     = false;
+       // mpib.setMacRxOnWhenIdle(false);
         capability.recvOnWhenIdle = mpib.getMacRxOnWhenIdle();
+      //  std::cout << "WEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE " << mpib.getMacRxOnWhenIdle()<< endl;
         capability.secuCapable = false;
         capability.alloShortAddr = true;
         ASSERT(getModuleByPath("^.^.^.") != NULL); // getModuleByPath returns the host module (and thus the parameter)
@@ -600,6 +601,8 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
 
             case 1:  // direct CAP ACK
             {
+                mpib.setMacRxOnWhenIdle(false);
+                //std::cout << "WEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE " << mpib.getMacRxOnWhenIdle()<< endl;
                 taskP.mcps_data_request_TxOption = DIRECT_TRANS;
                 data->setFcf(genFCF(Data, false, false, true, false, addrLong, 01, addrLong));
                 //data->setByteLength(calcFrameByteLength(data));
@@ -1539,6 +1542,7 @@ void IEEE802154Mac::handleLowerPDMsg(cMessage* msg)
     }
 
     // check timing for GTS (debug)
+
     if (frmType == Data && frame->getIsGTS())
     {
         if (isCoordinator)
@@ -1765,7 +1769,7 @@ void IEEE802154Mac::handleBeacon(mpdu *frame)
         //Non siamo sicurissimi che il securityEnabled debba essere preso dall'mpib
         if (mpib.getMacSecurityEnabled())
         {
-             drawBattery(IEEE802154Mac::BEACON_TEMP);
+            drawBattery(IEEE802154Mac::BEACON_TEMP);
             /**
              std::cout << " TESTO DECIFRATO IN HEX" << endl;
              printHex(encoded);
@@ -1816,6 +1820,8 @@ void IEEE802154Mac::handleBeacon(mpdu *frame)
                 rxSfSpec = bcnFrame->getSfSpec();
 
             }
+
+            setSecFrameCounter(bcnFrame->getSrc().str(), bcnFrame->getAsh().FrameCount);
 
             //std::cout << "RXSFSPEC  " << endl;
             //std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
@@ -2033,6 +2039,7 @@ void IEEE802154Mac::handleData(mpdu* frame)
 
         }
 
+        setSecFrameCounter(frame->getSrc().str(), frame->getAsh().FrameCount);
         //std::cout << "RXSFSPEC  " << endl;
         //std::cout << rxSfSpec.BO <<" "<<  rxSfSpec.BI <<" "<< rxSfSpec.SO <<" "<< rxSfSpec.SD <<" "<<  rxSfSpec.finalCap <<" "<< rxSfSpec.battLifeExt <<" "<< rxSfSpec.panCoor <<" "<<rxSfSpec.assoPmt<< endl;
 
@@ -2115,6 +2122,8 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                         assoInd->setCapabilityInformation(tempDevCap);
 
                     }
+
+                    setSecFrameCounter(tmpAssoReq->getSrc().str(), tmpAssoReq->getAsh().FrameCount);
 
                 }
                 else
@@ -2202,6 +2211,8 @@ void IEEE802154Mac::handleCommand(mpdu* frame)
                         aresp->setStatus(status);
 
                     }
+
+                    setSecFrameCounter(aresp->getSrc().str(), aresp->getAsh().FrameCount);
 
                 }
 
@@ -2424,7 +2435,7 @@ void IEEE802154Mac::handle_PLME_SET_TRX_STATE_confirm(phyState status)
         else if ((rxData != NULL)) // beacon enabled PAN - processing DATA frame
         {
             // here we use the hidden destination address that we already set in ACK on purpose
-            delay = csmacaLocateBoundary((rxData->getSrc().getShortAddr() == mpib.getMacCoordShortAddress()), 0.0) + dataTemp;
+            delay = csmacaLocateBoundary((rxData->getSrc().getShortAddr() == mpib.getMacCoordShortAddress()), 0.0);
             ASSERT(delay < bPeriod);
         }
         else if ((rxCmd != NULL)) // beacon enabled PAN - processing CMD frame
@@ -3449,7 +3460,31 @@ void IEEE802154Mac::sendDown(mpdu* frame)
     macEV
     << "Sending frame " << frame->getName() << " (" << frame->getByteLength() << " Bytes | Seq #" << (int) frame->getSqnr() << ") to PHY layer \n";
     macEV << "The estimated transmission time is " << calcDuration(frame) << " sec \n";
-    send(frame, "outPD");  // send a duplication
+    //send(frame, "outPD");  // send a duplication
+    if (mpib.getMacSecurityEnabled())
+    {
+
+        switch (typePacket)
+        {
+
+            case 0:
+                sendDelayed(frame, dataTemp + ackTemp, "outPD");
+                break;
+            case 1:
+                sendDelayed(frame, assoreqTemp, "outPD");
+                break;
+            case 2:
+                sendDelayed(frame, assorespTemp, "outPD");
+                break;
+
+        }
+
+    }
+    else
+    {
+        send(frame, "outPD");
+    }
+
 }
 
 void IEEE802154Mac::doScan()
@@ -4659,7 +4694,8 @@ void IEEE802154Mac::startTxAckBoundTimer(simtime_t wtime)
     {
         cancelEvent(txAckBoundTimer);
     }
-    scheduleAt(simTime() + wtime + ackTemp, txAckBoundTimer);
+    //scheduleAt(simTime() + wtime + ackTemp, txAckBoundTimer);
+    scheduleAt(simTime() + wtime, txAckBoundTimer);
 }
 
 void IEEE802154Mac::startTxCmdDataBoundTimer(simtime_t wtime)
@@ -4668,29 +4704,31 @@ void IEEE802154Mac::startTxCmdDataBoundTimer(simtime_t wtime)
     {
         cancelEvent(txCmdDataBoundTimer);
     }
-    if (mpib.getMacSecurityEnabled())
-    {
+    /**
+     if (mpib.getMacSecurityEnabled())
+     {
 
-        switch (typePacket)
-        {
+     switch (typePacket)
+     {
 
-            case 0:
-                scheduleAt(simTime() + wtime + dataTemp, txCmdDataBoundTimer);
-                break;
-            case 1:
-                scheduleAt(simTime() + wtime + assoreqTemp, txCmdDataBoundTimer);
-                break;
-            case 2:
-                scheduleAt(simTime() + wtime + assorespTemp, txCmdDataBoundTimer);
-                break;
+     case 0:
+     scheduleAt(simTime() + wtime + dataTemp, txCmdDataBoundTimer);
+     break;
+     case 1:
+     scheduleAt(simTime() + wtime + assoreqTemp, txCmdDataBoundTimer);
+     break;
+     case 2:
+     scheduleAt(simTime() + wtime + assorespTemp, txCmdDataBoundTimer);
+     break;
 
-        }
+     }
 
-    }
-    else
-    {
-        scheduleAt(simTime() + wtime, txCmdDataBoundTimer);
-    }
+     }
+     else
+     {
+     **/
+    scheduleAt(simTime() + wtime, txCmdDataBoundTimer);
+    // }
 
 }
 
@@ -5497,7 +5535,8 @@ void IEEE802154Mac::handleTxAckBoundTimer()
             macEV
             << "Sending " << txAck->getName() << " (" << txAck->getByteLength() << " Bytes | Seq #" << (unsigned int) txAck->getSqnr() << ") to PHY layer \n";
             macEV << "The estimated transmission time is " << calcDuration(txAck) << " sec \n";
-            send(txAck->dup(), "outPD");
+            //send(txAck->dup(), "outPD");
+            sendDelayed(txAck->dup(), ackTemp + dataTemp, "outPD");
         }
     }
 }
@@ -6635,6 +6674,7 @@ void IEEE802154Mac::resetTRX()
             macEV
             << "Radio is now in outgoing active period (as a coordinator), should stay awake and turn on receiver \n";
             t_state = phy_RX_ON;
+            //t_state = phy_IDLE;
         }
         else  // in RX SD, according to macRxOnWhenIdle
         {
@@ -8197,7 +8237,8 @@ std::string IEEE802154Mac::secRecPacket(mpdu * frame)
      std::cout << endl << endl;
      */
 
-    if(strcmp(decipherT.data(), "error") == 0){
+    if (strcmp(decipherT.data(), "error") == 0)
+    {
         std: cout << "pacchetto scartato perchè non corretto \n";
     }
     return decipherT;
@@ -8300,7 +8341,8 @@ std::string IEEE802154Mac::secRecAck(AckFrame* ack, int secuLevel)
             throw cRuntimeError("secuLevel error");
     }
 
-    if(strcmp(decipherT.data(), "error") == 0){
+    if (strcmp(decipherT.data(), "error") == 0)
+    {
         std: cout << "ack scartato perchè non corretto \n";
     }
 
@@ -8590,16 +8632,13 @@ bool IEEE802154Mac::checkSecFrameCounter(std::string mac, unsigned int frameCoun
 
         if (secFrameCounter.find(mac) == secFrameCounter.end())
         {
-            secFrameCounter[mac] = frameCounter + 1;
-           // cout << " nuova istanza per il mac: " << mac << " | con frame counter : " << frameCounter << endl;
+
             return true;
         }
         else
         {
             if (frameCounter >= secFrameCounter[mac])
             {
-                secFrameCounter[mac] = frameCounter + 1;
-                //cout << " presente il mac: " << mac << " | con frame counter : " << frameCounter << endl;
                 return true;
             }
             else
@@ -8611,6 +8650,20 @@ bool IEEE802154Mac::checkSecFrameCounter(std::string mac, unsigned int frameCoun
     }
 
     return true;
+
+}
+
+void IEEE802154Mac::setSecFrameCounter(std::string mac, unsigned int frameCounter)
+{
+
+    if (replayProtection)
+    {
+
+        secFrameCounter[mac] = frameCounter + 1;
+
+    }
+
+    return;
 
 }
 
