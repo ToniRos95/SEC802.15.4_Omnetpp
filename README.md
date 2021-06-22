@@ -1,7 +1,8 @@
-IEEE802154INET-Standalone
+Sec-IEEE802154INET-Standalone
 =========================
 
-A new IEEE 802.15.4-2006 Simulation Model for OMNeT++ / INET
+Network security project based on INET framework. Implemented security layer of 802.15.4 and patching "replay attack" vulnerability and "no integrity ack" attack.
+
 
 Minimum requirements are:
 
@@ -18,11 +19,4 @@ Usage instructions:
 - Compile INET 2.x and the the 802.15.4. project
 - Start it via the omnetpp.ini inside the simulations folder (Run/Debug As -> OMNeT Simulation)
 
-Tested example scenarios are already defined in the omnetpp.ini / scenarios.ini
-
-
-Directory structure:
-
-- /simulations --> contains network definition, omnetpp.ini and scenarios.ini where all settings are defined
-- /src/... --> contains source code under Modules and util folders and NED files under NED folder
 
